@@ -1,2 +1,6 @@
 
-int main(){}
+int main(){
+    int sono;
+
+
+}
