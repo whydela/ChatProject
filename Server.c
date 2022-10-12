@@ -10,6 +10,8 @@
 
 #define STDIN 0
 #define RFD "/RFD\0"
+#define YES "/YES\0"
+#define NO "/NO\0"
 
 void first_print(){
     int i;
