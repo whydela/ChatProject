@@ -33,7 +33,7 @@ void first_print(){
 
 }
 
-int listen_config(struct sockaddr_in* addr, int port){
+int ip_config(struct sockaddr_in* addr, int port){
 
     int sd;
     int ret;
@@ -73,6 +73,7 @@ int main(int argc, char *argv[])
     int newfd;                                      // Socket di comunicazione
     char buffer[1024];
     int i;
+    int addrlen;
 
     // Questa funzione si occupa della prima stampa a video
     first_print();
@@ -89,7 +90,7 @@ int main(int argc, char *argv[])
     // Il primo argomento riguarda un puntatore alla struttura dell'indirizzo del Server (struct sockaddr_in*)
     // Il secondo argomento riguarda la porta a cui si deve connettere (int)
     // La funzione restituisce il descrittore del socket di ascolto, chiamato listener
-    listener = listen_config(&my_addr, port);
+    listener = ip_config(&my_addr, port);
 
     // Il server crea una coda di 10 ascolti 
     ret = listen(listener, 10);
@@ -125,29 +126,25 @@ int main(int argc, char *argv[])
                     printf("Gestione comando '%s'\n\n", buffer);
                 }
 
-                else if(i == listener) {                         // Se quello pronto e' il listener
+                else if(i == listener) {                    // Se quello pronto e' il listener
                     
-                    printf("Il listener e' pronto\n", i);
                     addrlen = sizeof(cl_addr);
 
-                    // Accettiamo connessione su un nuovo socket fd
                     newfd = accept(listener, (struct sockaddr *)&cl_addr, &addrlen);
 
-                    printf("Ho accettato la connessione, aggiungo nuovo socket al SET\n");
+                    printf("Ho accettato la connessione sul listener, aggiungo nuovo socket al SET\n");
 
-                    //sleep(2);
-                    FD_SET(newfd, &master);                 // Aggiungo il nuovo socket al master
-                    fdmax=(newfd > fdmax) ? newfd : fdmax;  // Aggiorno fdmax
-                    
+                    FD_SET(newfd, &master);                     // Aggiungo il nuovo socket al master
+                    fdmax = (newfd > fdmax) ? newfd : fdmax;    // Aggiorno fdmax
+                   
                 } else{                                     // Se il socket pronto e' il comunicatore
+
                     /*
-                    //sleep(5);
                     ret = recv(i, buffer, sizeof(buffer), 0);
-                    if(!ret){                               // Socket i e' stato chiuso 
+                    if(!ret){                               // Socket i e' stato chiuso, (Device Offline ?) 
                         printf("Socket chiuso\n");
                         FD_CLR(i, &master);                 // Lo tolgo dal master 
                         close(i);                           // Lo chiudo
-                        //sleep(2);
                         printf("Chiudo il socket %d e lo tolgo dal set\n", i);
 
                     } else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
