@@ -8,6 +8,9 @@
 #include <unistd.h>
 #include <time.h>
 
+#define STDIN 0
+#define RFD "/RFD\0"
+
 void first_print(){
     int i;
     printf("\n");
@@ -25,7 +28,7 @@ void first_print(){
     printf("\n\n\nInserisci un comando:\n");
     printf("\n- list: Mostra gli utenti online.\n");
     printf("- esc:  Chiude il server.\n");
-    printf("\n(Digitare help per i dettagli dei comandi)\n\n\n\n");
+    printf("\n(Digitare help per i dettagli dei comandi)\n\n");
     
 
 }
@@ -65,14 +68,14 @@ int main(int argc, char *argv[])
     fd_set read_fds;                                // Set di lettura gestito dalla select 
     int fdmax;                                      // Numero max di descrittori
     struct sockaddr_in my_addr;                     // Indirizzo Server
-    //struct sockaddr_in cl_addr;                   // Indirizzo Client 
-    int listener;                                   // Socket per l'ascolto
-    //int newfd;                                    // Socket di comunicazione
-    //char buffer[1024];
+    struct sockaddr_in cl_addr;                     // Indirizzo Client 
+    int listener;                                   // Socket di ascolto
+    int newfd;                                      // Socket di comunicazione
+    char buffer[1024];
     int i;
 
     // Questa funzione si occupa della prima stampa a video
-    //first_print();
+    first_print();
 
 
     // Si inizializza la porta del Server, atoi converte da char ad intero
@@ -98,7 +101,8 @@ int main(int argc, char *argv[])
 
     // Aggiungo il listener al set master
     FD_SET(listener, &master);
-    FD_SET(0, &master);
+    // Aggiungo il descrittore della STDIN al set master
+    FD_SET(STDIN, &master);
 
     // Il socket maggiore sara' il listener
     fdmax = listener;
@@ -117,15 +121,15 @@ int main(int argc, char *argv[])
             if(FD_ISSET(i, &read_fds)) {                    // Trovato socket pronto
 
                 if(!i){                                     // Quello pronto riguarda la stdin
-                    printf("Vediamo se ho capito\n");
-                    FD_CLR(i, &master);
+                    scanf("%s", buffer);
+                    printf("Gestione comando '%s'\n\n", buffer);
                 }
 
                 else if(i == listener) {                         // Se quello pronto e' il listener
-                    /*
-                    printf("Il listener (socket %d) e' pronto\n", i);
-                    sleep(5);
+                    
+                    printf("Il listener e' pronto\n", i);
                     addrlen = sizeof(cl_addr);
+
                     // Accettiamo connessione su un nuovo socket fd
                     newfd = accept(listener, (struct sockaddr *)&cl_addr, &addrlen);
 
@@ -134,7 +138,7 @@ int main(int argc, char *argv[])
                     //sleep(2);
                     FD_SET(newfd, &master);                 // Aggiungo il nuovo socket al master
                     fdmax=(newfd > fdmax) ? newfd : fdmax;  // Aggiorno fdmax
-                    */
+                    
                 } else{                                     // Se il socket pronto e' il comunicatore
                     /*
                     //sleep(5);
