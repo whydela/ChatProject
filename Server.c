@@ -5,13 +5,19 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
+#include <stdbool.h>
 
 #define STDIN 0
 #define RFD "/RFD\0"
+#define CMD_REG "/REG\0"
+#define CMD_LOG "/LOGIN\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
+
+
 
 void first_print(){
     int i;
@@ -60,6 +66,35 @@ int ip_config(struct sockaddr_in* addr, int port){
 
 }
 
+bool check_word(FILE* ptr, char stringa[1024]){
+
+    char buffer[1024];
+
+    while(fscanf(ptr, "%s", buffer)==1){
+        if(strstr(buffer, stringa)){
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void send_dv(int sd, char* cmd){
+    // In questo momento sono connesso al server 
+    int ret;
+    
+    printf("Mando il segnale %s\n", cmd);
+    ret = send(sd, cmd, strlen(cmd)+1, 0);
+
+    if(ret < 0){
+        perror("Errore in fase di invio segnale: \n");
+        exit(1);
+    }
+    
+    printf("Segnale inviato\n");
+    
+}
+
 int main(int argc, char *argv[])
 {
     // Dichiarazioni Variabili
@@ -73,10 +108,12 @@ int main(int argc, char *argv[])
     struct sockaddr_in cl_addr;                     // Indirizzo Client 
     int listener;                                   // Socket di ascolto
     int newfd;                                      // Socket di comunicazione
+    char command[1024];
     char buffer[1024];
+    char username[1024];
     int i;
     int addrlen;
-
+    
     // Questa funzione si occupa della prima stampa a video
     first_print();
 
@@ -132,17 +169,19 @@ int main(int argc, char *argv[])
                     
                     addrlen = sizeof(cl_addr);
 
-                    newfd = accept(listener, (struct sockaddr *)&cl_addr, &addrlen);
+                    newfd = accept(listener, (struct sockaddr *)&cl_addr, (socklen_t*)&addrlen);
 
                     printf("Ho accettato la connessione sul listener, aggiungo nuovo socket al SET\n");
 
                     FD_SET(newfd, &master);                     // Aggiungo il nuovo socket al master
                     fdmax = (newfd > fdmax) ? newfd : fdmax;    // Aggiorno fdmax
+
                    
                 } else{                                     // Se il socket pronto e' il comunicatore
 
-                    /*
-                    ret = recv(i, buffer, sizeof(buffer), 0);
+
+                    ret = recv(i, command, sizeof(command), 0);   
+
                     if(!ret){                               // Socket i e' stato chiuso, (Device Offline ?) 
                         printf("Socket chiuso\n");
                         FD_CLR(i, &master);                 // Lo tolgo dal master 
@@ -151,13 +190,46 @@ int main(int argc, char *argv[])
 
                     } else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
 
-                        printf("Il comunicatore (socket %d) e' pronto\n", i);
-                        printf("E' arrivato il segnale %s\n", buffer);
+                        //printf("Il comunicatore (socket %d) e' pronto\n", i);
+                        printf("E' arrivato il comando %s\n", command);
+                        // ok
+                        if(!strcmp(command,CMD_REG)){
+                        while(1){
+                            printf("Comando %s riconosciuto\n", command);
+                            // Ricevo username
+                            ret = recv(i, username, sizeof(username), 0);
+                            printf("Ricevuto %s\n",username);
+                            FILE* fptr;
+                            // creo/apro un file contenente tutti gli username registrati
+                            fptr = fopen("all_usr.txt", "a+");
+
+                            if(!fptr){
+                                printf("ERRORE NELL'APERTURA DEL FILE\n");
+                            }
+                            // Questa funzione ricerca una stringa in un file, 
+                            // Restituisce true se la trova, altrimenti false
+                            // Prende in ingresso il puntatore del file e la stringa ricercata
+                            if(check_word(fptr, username)){
+                                // Dico al device che l'username non va bene
+                                // YES sta per: c'e' nella lista degli username registrati
+                                send_dv(i, YES);
+                                // Si richiede
+                                continue;
+                            }
+                            // Dico al device che l'username va bene
+                            // NO sta per: non c'e' nella lista degli username registrati
+                            send_dv(i, NO);
+                            
+                            fprintf(fptr, "%s\n", username);
+                            fclose(fptr);
+                            break;
+                        }
+                        }
                         
                         
                     } else{
                         perror("Errore nella reiceve: ");
-                    }*/
+                    }
                 }
             }
         }
