@@ -97,8 +97,10 @@ void send_dv(int sd, char* cmd){
 }
 
 void dev_reg(int sd){
+
     char username[1024];
     char password[1024];
+
     while(1){
         FILE* fptr;
         // Ricevo username
@@ -149,7 +151,66 @@ void dev_reg(int sd){
     }
 
 }
-   
+
+void dev_log(int sd){
+    char username[1024];
+    char password[1024];
+    
+    while(1){
+        FILE* fptr;
+        // Ricevo username
+        recv(sd, username, sizeof(username), 0);
+
+        printf("Ricevuto %s\n",username);
+
+        if(!strcpy(username, "signup"));{
+            return;
+        }
+
+        // Creo/apro un file contenente tutti gli username registrati
+        fptr = fopen("usr_all.txt", "r");
+
+        if(!fptr){
+            printf("Errore nell'apertura del file\n");
+        }
+
+        // Questa funzione ricerca una stringa in un file, 
+        // Restituisce true se la trova, altrimenti false
+        // Prende in ingresso il puntatore del file e la stringa ricercata
+        if(check_word(fptr, username)){
+            // Dico al device che l'username non va bene
+            // YES sta per: c'e' nella lista degli username registrati
+            send_dv(sd, YES);
+            // Si richiede
+            continue;
+        }
+
+        // Dico al device che l'username va bene
+        // NO sta per: non c'e' nella lista degli username registrati
+        send_dv(sd, NO);
+
+
+        fclose(fptr);
+/*
+        // Adesso gestiamo la password
+        recv(sd, password, sizeof(password), 0);
+        printf("Ricevuto %s\n",password);
+
+        // Apro/creo un file contenente tutti gli username registrati con la password affiancata
+        fptr = fopen("usr_psw.txt", "a+");
+        fprintf(fptr, "%s\n", password);
+
+        // Facciamo in modo che i permessi siano attivi solo per l'owner del file
+        // Come se il server avesse delle informazioni non accessibili dai device
+        chmod("usr_psw.txt", S_IRWXU);
+        fclose(fptr);
+*/
+        break;
+    }
+
+
+}
+
 int main(int argc, char *argv[])
 {
     // Dichiarazioni Variabili
@@ -164,7 +225,7 @@ int main(int argc, char *argv[])
     int listener;                                   // Socket di ascolto
     int newfd;                                      // Socket di comunicazione
     char command[1024];
-    char buffer[1024];
+    charbuffer[1024];
     int i;
     int addrlen;
     
@@ -202,7 +263,6 @@ int main(int argc, char *argv[])
     fdmax = listener;
 
     // Ciclo principale
-
     while(1){
 
         read_fds = master;
@@ -242,39 +302,33 @@ int main(int argc, char *argv[])
                         close(i);                           // Lo chiudo
                         printf("Chiudo il socket %d e lo tolgo dal set\n", i);
 
-                    } 
-                    else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
+                    } else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
 
                         //printf("Il comunicatore (socket %d) e' pronto\n", i);
                         printf("E' arrivato il comando %s\n", command);
 
                         // Gestione registrazione
                         if(!strcmp(command,CMD_REG)){
-                            //printf("Comando %s riconosciuto\n", command);
                             // La funzione si occupa della corretta registrazione del device
-                            // Prendo in ingresso il socket descriptor
+                            // Prende in ingresso il socket descriptor
                             dev_reg(i);
                         }
 
                         // Gestione login
                         if(!strcmp(command, CMD_LOG)){
-                            
+                            // La funzione si occupa del login del device
+                            // Prende in ingresso il socket descriptor
+                            dev_log(i);
                         }
+                        
                     } else{
                         perror("Errore nella reiceve: ");
+                        continue;
                     }
                 }
             }
         }
-
-
     }
-
-
-
-    
-
-
-    
+   
     return 0;
 }
