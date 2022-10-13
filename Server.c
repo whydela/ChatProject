@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <stdbool.h>
+#include <sys/stat.h>
 
 #define STDIN 0
 #define RFD "/RFD\0"
@@ -95,6 +96,60 @@ void send_dv(int sd, char* cmd){
     
 }
 
+void dev_reg(int sd){
+    char username[1024];
+    char password[1024];
+    while(1){
+        FILE* fptr;
+        // Ricevo username
+        recv(sd, username, sizeof(username), 0);
+
+        printf("Ricevuto %s\n",username);
+        // creo/apro un file contenente tutti gli username registrati
+        fptr = fopen("usr_all.txt", "a+");
+        if(!fptr){
+            printf("Errore nell'apertura del file\n");
+        }
+        // Questa funzione ricerca una stringa in un file, 
+        // Restituisce true se la trova, altrimenti false
+        // Prende in ingresso il puntatore del file e la stringa ricercata
+        if(check_word(fptr, username)){
+            // Dico al device che l'username non va bene
+            // YES sta per: c'e' nella lista degli username registrati
+            send_dv(sd, YES);
+            // Si richiede
+            continue;
+        }
+
+        // Dico al device che l'username va bene
+        // NO sta per: non c'e' nella lista degli username registrati
+        send_dv(sd, NO);
+
+        fprintf(fptr, "%s\n", username);
+
+        // Facciamo in modo che i permessi siano attivi solo per l'owner del file
+        // Come se il server avesse delle informazioni non accessibili dai device
+        chmod("usr_all.txt", S_IRWXU);
+        fclose(fptr);
+
+        // Adesso gestiamo la password
+        recv(sd, password, sizeof(password), 0);
+        printf("Ricevuto %s\n",password);
+
+        // Apro/creo un file contenente tutti gli username registrati con la password affiancata
+        fptr = fopen("usr_psw.txt", "a+");
+        fprintf(fptr, "%s\n", password);
+
+        // Facciamo in modo che i permessi siano attivi solo per l'owner del file
+        // Come se il server avesse delle informazioni non accessibili dai device
+        chmod("usr_psw.txt", S_IRWXU);
+        fclose(fptr);
+
+        break;
+    }
+
+}
+   
 int main(int argc, char *argv[])
 {
     // Dichiarazioni Variabili
@@ -110,7 +165,6 @@ int main(int argc, char *argv[])
     int newfd;                                      // Socket di comunicazione
     char command[1024];
     char buffer[1024];
-    char username[1024];
     int i;
     int addrlen;
     
@@ -188,45 +242,24 @@ int main(int argc, char *argv[])
                         close(i);                           // Lo chiudo
                         printf("Chiudo il socket %d e lo tolgo dal set\n", i);
 
-                    } else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
+                    } 
+                    else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
 
                         //printf("Il comunicatore (socket %d) e' pronto\n", i);
                         printf("E' arrivato il comando %s\n", command);
-                        // ok
-                        if(!strcmp(command,CMD_REG)){
-                        while(1){
-                            printf("Comando %s riconosciuto\n", command);
-                            // Ricevo username
-                            ret = recv(i, username, sizeof(username), 0);
-                            printf("Ricevuto %s\n",username);
-                            FILE* fptr;
-                            // creo/apro un file contenente tutti gli username registrati
-                            fptr = fopen("all_usr.txt", "a+");
 
-                            if(!fptr){
-                                printf("ERRORE NELL'APERTURA DEL FILE\n");
-                            }
-                            // Questa funzione ricerca una stringa in un file, 
-                            // Restituisce true se la trova, altrimenti false
-                            // Prende in ingresso il puntatore del file e la stringa ricercata
-                            if(check_word(fptr, username)){
-                                // Dico al device che l'username non va bene
-                                // YES sta per: c'e' nella lista degli username registrati
-                                send_dv(i, YES);
-                                // Si richiede
-                                continue;
-                            }
-                            // Dico al device che l'username va bene
-                            // NO sta per: non c'e' nella lista degli username registrati
-                            send_dv(i, NO);
+                        // Gestione registrazione
+                        if(!strcmp(command,CMD_REG)){
+                            //printf("Comando %s riconosciuto\n", command);
+                            // La funzione si occupa della corretta registrazione del device
+                            // Prendo in ingresso il socket descriptor
+                            dev_reg(i);
+                        }
+
+                        // Gestione login
+                        if(!strcmp(command, CMD_LOG)){
                             
-                            fprintf(fptr, "%s\n", username);
-                            fclose(fptr);
-                            break;
                         }
-                        }
-                        
-                        
                     } else{
                         perror("Errore nella reiceve: ");
                     }
