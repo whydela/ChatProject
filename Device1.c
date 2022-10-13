@@ -77,28 +77,60 @@ int srv_config(struct sockaddr_in* srv_addr){
 void send_srv(int sd, char* cmd){
     // In questo momento sono connesso al server 
     int ret;
-    
-    printf("Mando il messaggio %s\n", cmd);
+
     ret = send(sd, cmd, strlen(cmd)+1, 0);
 
     if(ret < 0){
-        perror("Errore in fase di invio comando: \n");
+        perror("Errore in fase di invio comando: ");
         exit(1);
     }
     
-    printf("Messaggio inviato\n");
+    printf("Messaggio %s inviato\n", cmd);
     
 }
 
+void reg_config(int srv_sd){
+
+    char username[1024];
+    char password[1024];
+    char buffer[1024];
+    char all[1024];
+
+    send_srv(srv_sd, CMD_REG);
+
+    while(1){
+        printf("Inserisci un username:\n");
+        scanf("%s", username);
+        //Mando l'username al server, lui controllera' se va bene
+        send_srv(srv_sd, username);
+        // Ricevo la risposta se va bene o no
+        recv(srv_sd, buffer, sizeof(buffer), 0);
+        // Se il server trova quell'username gia' in uso
+        if(!strcmp(buffer, YES)){
+            printf("\nATTENZIONE! Username gia' in uso\n\n");
+            continue;
+        } else{
+            // Altrimenti registra l'username e il device lo comunica
+            printf("\nUsername registrato\n\n");
+            break;
+        }
+    }
+
+    printf("Inserisci una password:\n");
+    scanf("%s", password);
+    
+    // Invio al server l'username e la password insieme
+    sprintf(all, "%s %s", username, password);
+    send_srv(srv_sd, all);
+
+}
 
 int main(int argc, char* argv[]){
 
     int ret, my_sd, port, srv_sd;
     struct sockaddr_in my_addr, srv_addr;
-    char spacenter;
-    char username[1024];
-    char buffer[1024];
-    //int i = 0;
+    char spacenter[1024];
+    //char buffer[1024];
 
     if(argc < 2){
         printf("Inserisci una porta\n");
@@ -122,46 +154,35 @@ int main(int argc, char* argv[]){
     ret = connect(srv_sd, (struct sockaddr*)&srv_addr, sizeof(srv_addr));
 
     if(ret < 0){
-        perror("Errore in fase di connessione: \n");
+        printf("\n\n\t\tSERVER OFFLINE !\n");
         exit(-1);
     }
 
     printf("\nDevice connesso al server\n");  
 
-    printf("\nSi prema spazio per fare login o enter per creare un account\n");
+    printf("\n--> Digiti SIGNUP per creare un account.\n\n");
+    printf("--> Se ha gia' un account registrato digiti LOGIN.\n\n");
 
-    while(1){
+    while(1){       
         
-        scanf("%c", &spacenter);
-        if(spacenter == '\n'){
-        
-            // printf("Gestione creazione account\n");
-            // Mando al server il comando
-            send_srv(srv_sd, CMD_REG);
-            
-            // QUI FAREI UNA FUNZIONCINA
-            while(1){
-                printf("Inserisci un username:\n");
-                scanf("%s", username);
-                //printf("Mando l'username al server, lui controllera' se va bene\n");
-                send_srv(srv_sd, username);
-                // Ricevo la risposta se va bene o no
-                recv(srv_sd, buffer, sizeof(buffer), 0);
-                if(!strcmp(buffer, YES)){
-                    printf("\nATTENZIONE! Username gia' in uso\n\n");
-                    continue;
-                } else{
-                    printf("\nUsername registrato\n\n");
-                    break;
-                }
-            }
+        scanf("%s", spacenter);
+        if(!strcmp(spacenter, "signup") || !strcmp(spacenter,"SIGNUP")){
+            printf("\nREGISTRAZIONE ACCOUNT IN CORSO\n\n");
+            // La funzione si occupa di tutta la fase di registrazione comprensiva di richiesta di username e password
+            reg_config(srv_sd);
+            printf("\nIL SUO ACCOUNT E' STATO REGISTRATO CORRETTAMENTE\n\n");
             break;
 
-        } else if(spacenter == ' '){
+        } else if(!strcmp(spacenter, "login") || !strcmp(spacenter, "LOGIN")){
             printf("Gestione login\n");
             break;
         }
         else{
+            printf("\nATTENZIONE ! Comando -%s- non riconosciuto.\n", spacenter);
+
+            printf("\n--> Digiti SIGNUP per creare un account.\n\n");
+            printf("--> Se ha gia' un account registrato digiti LOGIN.\n\n");
+
             continue;
         }
     }
