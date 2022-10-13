@@ -9,8 +9,11 @@
 
 
 #define BUFFER_SIZE 1024
-#define SIG_UP "LOGIN\0"
 #define SIG_RFD "RFD\0"
+#define CMD_REG "/REG\0"
+#define CMD_LOG "/LOGIN\0"
+#define YES "/YES\0"
+#define NO "/NO\0"
 
 void first_print(){
     int i;
@@ -26,8 +29,6 @@ void first_print(){
     for(i=0; i < 190; i++){
         printf("*");
     }
-
-    printf("\nSi prema spazio per fare login o enter per creare un account\n");
        
     
 }
@@ -59,7 +60,7 @@ int ip_config(struct sockaddr_in* addr, int port){
 
 int srv_config(struct sockaddr_in* srv_addr){
 
-    int sd, ret;
+    int sd;
 
     sd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -73,59 +74,100 @@ int srv_config(struct sockaddr_in* srv_addr){
 
 }
 
+void send_srv(int sd, char* cmd){
+    // In questo momento sono connesso al server 
+    int ret;
+    
+    printf("Mando il messaggio %s\n", cmd);
+    ret = send(sd, cmd, strlen(cmd)+1, 0);
+
+    if(ret < 0){
+        perror("Errore in fase di invio comando: \n");
+        exit(1);
+    }
+    
+    printf("Messaggio inviato\n");
+    
+}
+
+
 int main(int argc, char* argv[]){
 
-    int ret, my_sd, len, port, srv_sd;
+    int ret, my_sd, port, srv_sd;
     struct sockaddr_in my_addr, srv_addr;
-    char spacenter[1024];
-    char buffer[1024];
+    char spacenter;
     char username[1024];
-    int i = 0;
+    char buffer[1024];
+    //int i = 0;
 
     if(argc < 2){
         printf("Inserisci una porta\n");
         exit(-1);
     }
 
+    // Porta passata dalla linea di comando
     port = atoi(argv[1]);
-
 
     // Si connette il device alla porta desiderata 
     my_sd = ip_config(&my_addr, port);
+    if(my_sd > 10){}
 
     // Prima stampa
     first_print();
-    scanf("%s", spacenter);
 
-    // Ci si connette al server
+    // Configuriamo il socket connesso al server
     srv_sd = srv_config(&srv_addr);
 
+    // Connettiamo il Device al Server
+    ret = connect(srv_sd, (struct sockaddr*)&srv_addr, sizeof(srv_addr));
+
+    if(ret < 0){
+        perror("Errore in fase di connessione: \n");
+        exit(-1);
+    }
+
+    printf("\nDevice connesso al server\n");  
+
+    printf("\nSi prema spazio per fare login o enter per creare un account\n");
+
     while(1){
-        if(spacenter[0] == '\n'){
-            printf("Gestione creazione account\n");
+        
+        scanf("%c", &spacenter);
+        if(spacenter == '\n'){
+        
+            // printf("Gestione creazione account\n");
+            // Mando al server il comando
+            send_srv(srv_sd, CMD_REG);
+            
+            // QUI FAREI UNA FUNZIONCINA
+            while(1){
+                printf("Inserisci un username:\n");
+                scanf("%s", username);
+                //printf("Mando l'username al server, lui controllera' se va bene\n");
+                send_srv(srv_sd, username);
+                // Ricevo la risposta se va bene o no
+                recv(srv_sd, buffer, sizeof(buffer), 0);
+                if(!strcmp(buffer, YES)){
+                    printf("\nATTENZIONE! Username gia' in uso\n\n");
+                    continue;
+                } else{
+                    printf("\nUsername registrato\n\n");
+                    break;
+                }
+            }
             break;
-        } else if(spacenter[0] == ' '){
-            printf("Gestione login");
+
+        } else if(spacenter == ' '){
+            printf("Gestione login\n");
+            break;
         }
         else{
             continue;
         }
     }
 
-    // Si manda un segnale al Server per notificare che l'utente e' online
-    // La funzione hey_server() e' una booleana che restituisce true nel caso di
-    // primo accesso in assoluto, altrimenti false
-    /*
+    sleep(60);
 
-            printf("Inserisci un username\n");
-            scanf("%s", username);
-            if(hey_server(other signal)){
-                printf("Username gia' utilizzato\n");
-            }
-
-        }
-    }
-    */
 
 
     return 0;
