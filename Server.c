@@ -69,9 +69,12 @@ int ip_config(struct sockaddr_in* addr, int port){
 
 bool check_word(FILE* ptr, char stringa[1024]){
 
+    printf("Checkiamo la parola %s\n", stringa);
+
     char buffer[1024];
 
     while(fscanf(ptr, "%s", buffer)==1){
+        printf("%s\n", buffer);
         if(strstr(buffer, stringa)){
             return true;
         }
@@ -102,19 +105,24 @@ void dev_reg(int sd){
     char password[1024];
 
     while(1){
+
         FILE* fptr;
         // Ricevo username
         recv(sd, username, sizeof(username), 0);
 
         printf("Ricevuto %s\n",username);
         // creo/apro un file contenente tutti gli username registrati
-        fptr = fopen("usr_all.txt", "a+");
-        if(!fptr){
-            printf("Errore nell'apertura del file\n");
-        }
+        
+
         // Questa funzione ricerca una stringa in un file, 
         // Restituisce true se la trova, altrimenti false
         // Prende in ingresso il puntatore del file e la stringa ricercata
+        fptr = fopen("usr_all.txt", "r");
+
+        if(!fptr){
+            printf("Errore nell'apertura del file\n");
+        }
+
         if(check_word(fptr, username)){
             // Dico al device che l'username non va bene
             // YES sta per: c'e' nella lista degli username registrati
@@ -126,6 +134,13 @@ void dev_reg(int sd){
         // Dico al device che l'username va bene
         // NO sta per: non c'e' nella lista degli username registrati
         send_dv(sd, NO);
+
+        fclose(fptr); 
+        fptr = fopen("usr_all.txt", "a");
+
+        if(!fptr){
+            printf("Errore nell'apertura del file\n");
+        }
 
         fprintf(fptr, "%s\n", username);
 
@@ -150,24 +165,32 @@ void dev_reg(int sd){
         break;
     }
 
+    printf("%s registrato nel sistema\n", username);
+
 }
 
-void dev_log(int sd){
+bool dev_log(int sd){
+
     char username[1024];
     char password[1024];
+
+    FILE* fptr;
     
     while(1){
-        FILE* fptr;
+        printf("Gestione username\n");
         // Ricevo username
         recv(sd, username, sizeof(username), 0);
 
         printf("Ricevuto %s\n",username);
 
-        if(!strcpy(username, "signup"));{
-            return;
+        if(!strcmp(username, "signup")){
+            printf("Si vuole registrare\n");    
+            return true;
         }
 
         // Creo/apro un file contenente tutti gli username registrati
+        // Lo apro in scrittura perche' nel caso in cui ci sia un tentativo di login come primo comando in assoluto,
+        // aprire il file in sola lettura non implica la sua creazione, ciò provocherebbe una crisi di consistenza 
         fptr = fopen("usr_all.txt", "r");
 
         if(!fptr){
@@ -181,38 +204,55 @@ void dev_log(int sd){
             // Dico al device che l'username non va bene
             // YES sta per: c'e' nella lista degli username registrati
             send_dv(sd, YES);
+        } else{
             // Si richiede
+            // Dico al device che l'username va bene
+            // NO sta per: non c'e' nella lista degli username registrati
+            send_dv(sd, NO);
             continue;
         }
 
-        // Dico al device che l'username va bene
-        // NO sta per: non c'e' nella lista degli username registrati
-        send_dv(sd, NO);
-
-
         fclose(fptr);
-/*
-        // Adesso gestiamo la password
-        recv(sd, password, sizeof(password), 0);
-        printf("Ricevuto %s\n",password);
 
-        // Apro/creo un file contenente tutti gli username registrati con la password affiancata
-        fptr = fopen("usr_psw.txt", "a+");
-        fprintf(fptr, "%s\n", password);
-
-        // Facciamo in modo che i permessi siano attivi solo per l'owner del file
-        // Come se il server avesse delle informazioni non accessibili dai device
-        chmod("usr_psw.txt", S_IRWXU);
-        fclose(fptr);
-*/
         break;
     }
 
+    // Adesso gestiamo la password
+    while(1){
+            printf("Gestione password\n");
+            recv(sd, password, sizeof(password), 0);
+            printf("Ricevuto %s\n", password);
+
+
+            // Apro/creo un file contenente tutti gli username registrati con la password affiancata
+            fptr = fopen("usr_psw.txt", "r");
+
+            // Questa funzione ricerca una stringa in un file, 
+            // Restituisce true se la trova, altrimenti false
+            // Prende in ingresso il puntatore del file e la stringa ricercata
+
+            if(check_word(fptr, password)){
+                // Dico al device che l'username non va bene
+                // YES sta per: c'e' nella lista degli username registrati
+                send_dv(sd, YES);
+            } else{
+                send_dv(sd, NO);
+                // Si richiede
+                continue;
+            }
+
+            fclose(fptr);
+            break;        
+
+    }
+
+    printf("%s loggato nel sistema\n", username);
+
+    return false;
 
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     // Dichiarazioni Variabili
 
     int port;                                       // Porta a cui e' associato il Server
@@ -225,7 +265,7 @@ int main(int argc, char *argv[])
     int listener;                                   // Socket di ascolto
     int newfd;                                      // Socket di comunicazione
     char command[1024];
-    charbuffer[1024];
+    char buffer[1024];
     int i;
     int addrlen;
     
@@ -270,7 +310,7 @@ int main(int argc, char *argv[])
         printf("Parte il ciclo e chiamo la select\n");
         select(fdmax + 1, &read_fds, NULL, NULL, NULL);
 
-         for(i=0; i<=fdmax; i++) {
+        for(i=0; i<=fdmax; i++) {
             // Cerco quelli pronti
             if(FD_ISSET(i, &read_fds)) {                    // Trovato socket pronto
 
@@ -293,7 +333,7 @@ int main(int argc, char *argv[])
                    
                 } else{                                     // Se il socket pronto e' il comunicatore
 
-
+                while(1){
                     ret = recv(i, command, sizeof(command), 0);   
 
                     if(!ret){                               // Socket i e' stato chiuso, (Device Offline ?) 
@@ -311,24 +351,27 @@ int main(int argc, char *argv[])
                         if(!strcmp(command,CMD_REG)){
                             // La funzione si occupa della corretta registrazione del device
                             // Prende in ingresso il socket descriptor
+                            printf("Gestione registrazione\n");
                             dev_reg(i);
                         }
 
                         // Gestione login
-                        if(!strcmp(command, CMD_LOG)){
+                        else if(!strcmp(command, CMD_LOG)){
+                            printf("Gestione login \n");
                             // La funzione si occupa del login del device
                             // Prende in ingresso il socket descriptor
-                            dev_log(i);
+                            if(dev_log(i)){
+                                continue;
+                            }
                         }
-                        
                     } else{
                         perror("Errore nella reiceve: ");
-                        continue;
                     }
-                }
+                    break;
+                } 
+                }     
             }
         }
     }
-   
     return 0;
 }
