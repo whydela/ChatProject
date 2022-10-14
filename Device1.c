@@ -31,9 +31,7 @@ void first_print(){
     printf("DEVICE AVVIATO\n");
     for(i=0; i < 190; i++){
         printf("*");
-    }
-       
-    
+    }    
 }
 
 int ip_config(struct sockaddr_in* addr, int port){
@@ -78,6 +76,7 @@ int srv_config(struct sockaddr_in* srv_addr){
 }
 
 void send_srv(int sd, char* cmd){
+
     // In questo momento sono connesso al server 
     int ret;
 
@@ -88,7 +87,7 @@ void send_srv(int sd, char* cmd){
         exit(1);
     }
     
-    //printf("Messaggio %s inviato\n", cmd);
+    printf("Messaggio %s inviato\n", cmd);
     
 }
 
@@ -123,8 +122,9 @@ void reg_config(int sd){
     scanf("%s", password);
     
     // Invio al server l'username e la password insieme
-    sprintf(all, "%s %s", username, password);
-    send_srv(sd, all);
+    strcat(username, password);
+    printf("%s\n", username);
+    send_srv(sd, username);
 
 }
 
@@ -133,48 +133,68 @@ bool log_config(int sd){
     char username[1024];
     char password[1024];
     char buffer[1024];
-    char all[1024];
+    //char all[1024];
+    int i = 0;
 
     send_srv(sd, CMD_LOG);
 
-    while(1){
-        printf("Inserisci un username:\n");
-        scanf("%s", username);
+    printf("Inserisca l'username:\n");
 
-        //Mando l'username al server, lui controllera' se va bene
+    while(1){
+
+        scanf("%s", username);
+        i++;
+        //printf("%d", i);
+        // Mando l'username al server, lui controllera' se va bene
         send_srv(sd, username);
+
+        if(!(strcmp(username, "signup")) && i){
+            return true;
+        }
+
 
         // Ricevo la risposta se va bene o no
         recv(sd, buffer, sizeof(buffer), 0);
 
-        // Se il server trova quell'username gia' in uso
+        // Se il server NON trova quell'username
         if(!strcmp(buffer, NO)){
             printf("\nATTENZIONE! Username non esistente.\n\n");
             printf("- Si prega di inserire un username esistente.\n");
-            printf("- Per creare un account digiti signup.\n->");
-            while(1){
-                scanf("%s", buffer);
-                if(!strcpy(buffer, "signup")){
-                    return true;
-                }
-                printf("\nATTENZIONE ! Comando -%s- non riconosciuto.\n", buffer);
-                printf("\n- Si prega di inserire un username esistente.\n");
-                printf("- Per creare un account digiti signup.\n->");
-            }
+            printf("- Per creare un account digiti signup.\n-> ");
+            continue;
         } else{
             // Altrimenti registra l'username e il device lo comunica
-            printf("\nUsername registrato\n\n");
-            
             break;
         }
     }
 
-    printf("Inserisci una password:\n");
-    scanf("%s", password);
+    printf("Inserisca la password:\n");
+
+    while(1){
+
+        scanf("%s", password);
+
+
+        //Mando password ed username al server, lui controllera' se va bene
+        //sprintf(all, "%s%s", username, password);
+        strcat(password, username);
+        printf("%s\n", password);
+        send_srv(sd, username);
+        // Ricevo la risposta se va bene o no
+        recv(sd, buffer, sizeof(buffer), 0);
+
+        // Se il server NON trova quell'username
+        if(!strcmp(buffer, NO)){
+            printf("\nATTENZIONE! Password non corretta.\n\n");
+            printf("- Si prega di inserire una password corretta:\n");
+            continue;
+        } else{
+            // Altrimenti registra l'username e il device lo comunica
+            printf("\nUsername online\n\n");
+            break;
+        }
+    }
     
-    // Invio al server l'username e la password insieme
-    sprintf(all, "%s %s", username, password);
-    send_srv(sd, all);
     return false;
 
 }
@@ -187,7 +207,7 @@ int main(int argc, char* argv[]){
     //char buffer[1024];
 
     if(argc < 2){
-        printf("Inserisci una porta\n");
+        printf("Inserisca una porta\n");
         exit(-1);
     }
 
@@ -230,10 +250,14 @@ int main(int argc, char* argv[]){
         } else if(!strcmp(spacenter, "login") || !strcmp(spacenter, "LOGIN")){
             printf("Gestione login\n");
             // La funzione si occupa di tutta la fase di login
+            // E' una booleana: se ritorna true vuol dire che l'utente vuole fare la signup
             if(log_config(srv_sd)){
-                
-                continue;
+                    printf("\nREGISTRAZIONE ACCOUNT IN CORSO\n\n");
+                    // La funzione si occupa di tutta la fase di registrazione comprensiva di richiesta di username e password
+                    reg_config(srv_sd);
+                    printf("\nIL SUO ACCOUNT E' STATO REGISTRATO CORRETTAMENTE\n\n");
             }
+            break;
         }
         else{
             printf("\nATTENZIONE ! Comando -%s- non riconosciuto.\n", spacenter);
