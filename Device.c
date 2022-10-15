@@ -11,12 +11,16 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 
-#define BUFFER_SIZE 1024
 #define SIG_RFD "RFD\0"
 #define CMD_REG "/REG\0"
 #define CMD_LOG "/LOGIN\0"
+#define CMD_TMS "/TIMESTAMP\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
+
+char username[1024];                    // username del device
+char password[1024];                    // password del device
+char timestamp[1024];                   // username*timestamp*porta del device
 
 void first_print(){
     int i;
@@ -59,7 +63,7 @@ int ip_config(struct sockaddr_in* addr, int port){
 
 }
 
-int srv_config(struct sockaddr_in* srv_addr){
+int srv_config(struct sockaddr_in* srv_addr, int port){
 
     int sd;
 
@@ -67,7 +71,7 @@ int srv_config(struct sockaddr_in* srv_addr){
 
     memset(srv_addr, 0, sizeof(*srv_addr)); // Pulizia 
     (*srv_addr).sin_family = AF_INET;          // Address family
-    (*srv_addr).sin_port = htons(4242);
+    (*srv_addr).sin_port = htons(port);
 
     inet_pton(AF_INET, "127.0.0.1", &(*srv_addr).sin_addr);
 
@@ -79,7 +83,7 @@ void send_srv(int sd, char* cmd){
 
     // In questo momento sono connesso al server 
     int ret;
-
+    printf("Invio %s\n", cmd);
     ret = send(sd, cmd, strlen(cmd)+1, 0);
 
     if(ret < 0){
@@ -87,14 +91,12 @@ void send_srv(int sd, char* cmd){
         exit(1);
     }
     
-    //printf("Messaggio %s inviato\n", cmd);
+    printf("Messaggio %s inviato\n", cmd);
     
 }
 
 void reg_config(int sd){
 
-    char username[1024];
-    char password[1024];
     char buffer[1024];
     //char all[1024];
 
@@ -130,17 +132,17 @@ void reg_config(int sd){
         break;
     }
     
+    strcpy(buffer, username);
     // Invio al server l'username e la password insieme
     strcat(username, password);
     //printf("%s\n", username);
     send_srv(sd, username);
+    strcpy(username, buffer);
 
 }
 
 bool log_config(int sd){
 
-    char username[1024];
-    char password[1024];
     char buffer[1024];
     char all[1024];
     int i = 0;
@@ -176,6 +178,7 @@ bool log_config(int sd){
             break;
         }
     }
+
 
     printf("\n- Inserisca la password:\n\n-> ");
 
@@ -218,9 +221,35 @@ bool log_config(int sd){
 
 }
 
+void online_config(int sd, int port){
+    
+
+    char buffer[1024];
+    time_t rawtime;
+    struct tm * timeinfo;
+
+    // Invio comando
+    send_srv(sd, CMD_TMS);
+    sleep(1);
+    // Invio username online
+    send_srv(sd, username);
+
+    time(&rawtime);
+    // Converto l'ora
+    timeinfo = localtime(&rawtime);
+    // Creo la risposta mettendola in "timestamp"
+    sprintf(timestamp, "%d:%d:%d", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+    sprintf(buffer, "%s*%s*%d", username, timestamp, port);
+    sleep(1);
+    send_srv(sd, buffer);
+    strcpy(timestamp, buffer);
+
+
+}
+
 int main(int argc, char* argv[]){
 
-    int ret, my_sd, port, srv_sd;
+    int ret, my_sd, port, srv_sd, srv_port;
     struct sockaddr_in my_addr, srv_addr;
     char spacenter[1024];
     //char buffer[1024];
@@ -237,19 +266,28 @@ int main(int argc, char* argv[]){
     my_sd = ip_config(&my_addr, port);
     if(my_sd > 10){}
 
+
+    printf("\nConnessione al server in corso...\n");
+
+    while(1){
+        printf("\nSi prega di inserire la porta del Server a cui si vuole accedere:\n\n-> ");
+        //scanf("%d", &srv_port);
+        srv_port=4242;
+        // Configuriamo il socket connesso al server
+        srv_sd = srv_config(&srv_addr, srv_port);
+        // Connettiamo il Device al Server
+        ret = connect(srv_sd, (struct sockaddr*)&srv_addr, sizeof(srv_addr));
+        if(ret < 0){
+            printf("\nATTENZIONE! Server offline sulla porta %d.\n\n--> La porta 4242 e' quella di default.\n", srv_port);
+            continue;
+        }
+        break;
+    }
+
+
+
     // Prima stampa
     first_print();
-
-    // Configuriamo il socket connesso al server
-    srv_sd = srv_config(&srv_addr);
-
-    // Connettiamo il Device al Server
-    ret = connect(srv_sd, (struct sockaddr*)&srv_addr, sizeof(srv_addr));
-
-    if(ret < 0){
-        printf("\n\n\t\tSERVER OFFLINE !\n");
-        exit(-1);
-    }
 
     //printf("\nDevice connesso al server\n");  
 
@@ -281,14 +319,17 @@ int main(int argc, char* argv[]){
         else{
             printf("\nATTENZIONE ! Comando -%s- non riconosciuto.\n", spacenter);
             printf("\n--> Digiti SIGNUP per creare un account.\n\n");
-            printf("--> Se ha gia' un account registrato digiti LOGIN.\n\n");
+            printf("--> Se ha gia' un account registrato digiti LOGIN.\n\n-> ");
             continue;
         }
     }
 
+    printf("\nDevice ONLINE !\n");
+
+    // Adesso il Device e' online, dobbiamo inviare al Server il timestamp corrente
+    online_config(srv_sd, port);
+
     sleep(60);
-
-
 
     return 0;
 
