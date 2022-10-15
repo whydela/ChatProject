@@ -74,7 +74,7 @@ bool check_word(FILE* ptr, char stringa[1024]){
     char buffer[1024];
 
     while(fscanf(ptr, "%s", buffer)==1){
-        printf("%s\n", buffer);
+        printf("Trovo %s\n", buffer);
         if(strstr(buffer, stringa)){
             return true;
         }
@@ -87,7 +87,7 @@ void send_dv(int sd, char* cmd){
     // In questo momento sono connesso al server 
     int ret;
     
-    printf("Mando il segnale %s\n", cmd);
+    //printf("Mando il segnale %s\n", cmd);
     ret = send(sd, cmd, strlen(cmd)+1, 0);
 
     if(ret < 0){
@@ -95,7 +95,7 @@ void send_dv(int sd, char* cmd){
         exit(1);
     }
     
-    printf("Segnale inviato\n");
+    printf("Segnale %s inviato\n", cmd);
     
 }
 
@@ -119,11 +119,12 @@ void dev_reg(int sd){
         // Prende in ingresso il puntatore del file e la stringa ricercata
         fptr = fopen("usr_all.txt", "r");
 
+
         if(!fptr){
             printf("Errore nell'apertura del file\n");
         }
 
-        if(check_word(fptr, username)){
+        if(fptr && check_word(fptr, username)){
             // Dico al device che l'username non va bene
             // YES sta per: c'e' nella lista degli username registrati
             send_dv(sd, YES);
@@ -135,7 +136,10 @@ void dev_reg(int sd){
         // NO sta per: non c'e' nella lista degli username registrati
         send_dv(sd, NO);
 
-        fclose(fptr); 
+        if (fptr) {
+            fclose(fptr);
+        } 
+
         fptr = fopen("usr_all.txt", "a");
 
         if(!fptr){
@@ -195,6 +199,8 @@ bool dev_log(int sd){
 
         if(!fptr){
             printf("Errore nell'apertura del file\n");
+            send_dv(sd, NO);
+            continue;
         }
 
         // Questa funzione ricerca una stringa in un file, 
@@ -223,6 +229,10 @@ bool dev_log(int sd){
             recv(sd, password, sizeof(password), 0);
             printf("Ricevuto %s\n", password);
 
+            if(!strcmp(password, "signup")){
+                printf("Si vuole registrare\n");    
+                return true;
+            }
 
             // Apro/creo un file contenente tutti gli username registrati con la password affiancata
             fptr = fopen("usr_psw.txt", "r");
