@@ -15,6 +15,7 @@
 #define RFD "/RFD\0"
 #define CMD_REG "/REG\0"
 #define CMD_LOG "/LOGIN\0"
+#define CMD_TMS "/TIMESTAMP\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
 
@@ -117,12 +118,7 @@ void dev_reg(int sd){
         // Questa funzione ricerca una stringa in un file, 
         // Restituisce true se la trova, altrimenti false
         // Prende in ingresso il puntatore del file e la stringa ricercata
-        fptr = fopen("usr_all.txt", "r");
-
-
-        if(!fptr){
-            printf("Errore nell'apertura del file\n");
-        }
+        fptr = fopen("srv/usr_all.txt", "r");
 
         if(fptr && check_word(fptr, username)){
             // Dico al device che l'username non va bene
@@ -140,7 +136,7 @@ void dev_reg(int sd){
             fclose(fptr);
         } 
 
-        fptr = fopen("usr_all.txt", "a");
+        fptr = fopen("srv/usr_all.txt", "a");
 
         if(!fptr){
             printf("Errore nell'apertura del file\n");
@@ -150,7 +146,7 @@ void dev_reg(int sd){
 
         // Facciamo in modo che i permessi siano attivi solo per l'owner del file
         // Come se il server avesse delle informazioni non accessibili dai device
-        chmod("usr_all.txt", S_IRWXU);
+        chmod("srv/usr_all.txt", S_IRWXU);
         fclose(fptr);
 
         // Adesso gestiamo la password
@@ -158,12 +154,12 @@ void dev_reg(int sd){
         printf("Ricevuto %s\n",password);
 
         // Apro/creo un file contenente tutti gli username registrati con la password affiancata
-        fptr = fopen("usr_psw.txt", "a+");
+        fptr = fopen("srv/usr_psw.txt", "a+");
         fprintf(fptr, "%s\n", password);
 
         // Facciamo in modo che i permessi siano attivi solo per l'owner del file
         // Come se il server avesse delle informazioni non accessibili dai device
-        chmod("usr_psw.txt", S_IRWXU);
+        chmod("srv/usr_psw.txt", S_IRWXU);
         fclose(fptr);
 
         break;
@@ -195,7 +191,7 @@ bool dev_log(int sd){
         // Creo/apro un file contenente tutti gli username registrati
         // Lo apro in scrittura perche' nel caso in cui ci sia un tentativo di login come primo comando in assoluto,
         // aprire il file in sola lettura non implica la sua creazione, ciò provocherebbe una crisi di consistenza 
-        fptr = fopen("usr_all.txt", "r");
+        fptr = fopen("srv/usr_all.txt", "r");
 
         if(!fptr){
             printf("Errore nell'apertura del file\n");
@@ -235,7 +231,7 @@ bool dev_log(int sd){
             }
 
             // Apro/creo un file contenente tutti gli username registrati con la password affiancata
-            fptr = fopen("usr_psw.txt", "r");
+            fptr = fopen("srv/usr_psw.txt", "r");
 
             // Questa funzione ricerca una stringa in un file, 
             // Restituisce true se la trova, altrimenti false
@@ -262,6 +258,47 @@ bool dev_log(int sd){
 
 }
 
+void dev_online(int sd){
+
+    char buffer[1024];
+    char timestamp[1024];
+
+    bool online;
+
+    FILE* fptr;
+
+    // Ricevo username
+    recv(sd, buffer, sizeof(buffer), 0);
+    printf("Ricevuto %s\n", buffer);
+
+    fptr = fopen("srv/usr_online.txt", "a+");
+    online = check_word(fptr, buffer);
+    if(!online){
+        printf("Entro e scrivo\n");
+        fptr = fopen("srv/usr_online.txt", "a");
+        fprintf(fptr, "%s\n", buffer);
+    }
+
+    chmod("srv/usr_online.txt", S_IRWXU);
+    fclose(fptr);
+
+    // Ricevo timestamp
+    recv(sd, timestamp, sizeof(buffer), 0);
+    printf("Ricevuto %s\n", timestamp);
+
+    // Creo/apro un file contenente tutti gli username registrati
+    // Lo apro in scrittura perche' nel caso in cui ci sia un tentativo di login come primo comando in assoluto,
+    // aprire il file in sola lettura non implica la sua creazione, ciò provocherebbe una crisi di consistenza
+    fptr = fopen("srv/usr_log.txt", "a+");
+    if(!online){
+        fprintf(fptr, "%s\n", timestamp);
+    }
+    chmod("srv/usr_log.txt", S_IRWXU);
+        
+    fclose(fptr);
+
+}
+
 int main(int argc, char *argv[]) {
     // Dichiarazioni Variabili
 
@@ -278,6 +315,7 @@ int main(int argc, char *argv[]) {
     char buffer[1024];
     int i;
     int addrlen;
+
     
     // Questa funzione si occupa della prima stampa a video
     first_print();
@@ -303,6 +341,11 @@ int main(int argc, char *argv[]) {
         perror("Errore nella listen: ");
         exit(-1);
     }
+
+
+    // Creo la cartella del Server
+    mkdir("srv", 0700);
+    
 
     // Aggiungo il listener al set master
     FD_SET(listener, &master);
@@ -373,6 +416,11 @@ int main(int argc, char *argv[]) {
                             if(dev_log(i)){
                                 continue;
                             }
+                        }
+                        // Gestione timestamp
+                        else if(!strcmp(command, CMD_TMS)){
+                            printf("Gestione timestamp\n");
+                            dev_online(i);
                         }
                     } else{
                         perror("Errore nella reiceve: ");
