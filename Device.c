@@ -87,7 +87,7 @@ void send_srv(int sd, char* cmd){
         exit(1);
     }
     
-    printf("Messaggio %s inviato\n", cmd);
+    //printf("Messaggio %s inviato\n", cmd);
     
 }
 
@@ -96,32 +96,43 @@ void reg_config(int sd){
     char username[1024];
     char password[1024];
     char buffer[1024];
-    char all[1024];
+    //char all[1024];
 
     send_srv(sd, CMD_REG);
 
     while(1){
-        printf("Inserisca un username:\n-> ");
+        printf("- Inserisca un username:\n\n-> ");
         scanf("%s", username);
+        if(!strcmp(username, "signup")){
+            printf("\nATTENZIONE! Si prega di utilizzare un altro username.\n\n");
+            continue;
+        }
         //Mando l'username al server, lui controllera' se va bene
         send_srv(sd, username);
         // Ricevo la risposta se va bene o no
         recv(sd, buffer, sizeof(buffer), 0);
         // Se il server trova quell'username gia' in uso
         if(!strcmp(buffer, YES)){
-            printf("\nATTENZIONE! Username gia' in uso\n\n");
+            printf("\nATTENZIONE! Username gia' in uso.\n\n");
             continue;
         } else{
             break;
         }
     }
 
-    printf("Inserisca una password:\n-> ");
-    scanf("%s", password);
+    while(1){
+        printf("\n- Inserisca una password:\n\n-> ");
+        scanf("%s", password);
+        if(!strcmp(password, "signup")){
+            printf("\nATTENZIONE! Si prega di utilizzare un'altra password.\n");
+            continue;
+        }
+        break;
+    }
     
     // Invio al server l'username e la password insieme
     strcat(username, password);
-    printf("%s\n", username);
+    //printf("%s\n", username);
     send_srv(sd, username);
 
 }
@@ -131,12 +142,12 @@ bool log_config(int sd){
     char username[1024];
     char password[1024];
     char buffer[1024];
-    //char all[1024];
+    char all[1024];
     int i = 0;
 
     send_srv(sd, CMD_LOG);
 
-    printf("Inserisca l'username:\n-> ");
+    printf("\n- Inserisca l'username:\n\n-> ");
 
     while(1){
 
@@ -158,7 +169,7 @@ bool log_config(int sd){
         if(!strcmp(buffer, NO)){
             printf("\nATTENZIONE! Username non esistente.\n\n");
             printf("- Si prega di inserire un username esistente.\n");
-            printf("- Per creare un account digiti signup.\n-> ");
+            printf("- Per creare un account digiti signup.\n\n-> ");
             continue;
         } else{
             // Altrimenti registra l'username e il device lo comunica
@@ -166,25 +177,35 @@ bool log_config(int sd){
         }
     }
 
-    printf("Inserisca la password:\n-> ");
+    printf("\n- Inserisca la password:\n\n-> ");
+
+    i = 0;
 
     while(1){
-
+        
         scanf("%s", password);
 
-
+        if(!(strcmp(password, "signup")) && i){
+            send_srv(sd, password);
+            return true;
+        }
         //Mando password ed username al server, lui controllera' se va bene
         //sprintf(all, "%s%s", username, password);
-        strcat(password, username);
-        printf("%s\n", password);
-        send_srv(sd, username);
+        strcpy(all, username);
+        // all = username.
+        strcat(all, password);
+        // all = usernamepassword.
+        //printf("%s\n", all);
+        send_srv(sd, all);
         // Ricevo la risposta se va bene o no
         recv(sd, buffer, sizeof(buffer), 0);
 
+        i++;
         // Se il server NON trova quell'username
         if(!strcmp(buffer, NO)){
             printf("\nATTENZIONE! Password non corretta.\n\n");
-            printf("- Si prega di inserire una password corretta:\n");
+            printf("- Si prega di inserire una password corretta.\n");
+            printf("- Altrimenti digiti signup per registrare un account.\n\n-> ");
             continue;
         } else{
             // Altrimenti registra l'username e il device lo comunica
@@ -232,28 +253,28 @@ int main(int argc, char* argv[]){
 
     //printf("\nDevice connesso al server\n");  
 
-    printf("\n--> Digiti SIGNUP per creare un account.\n\n");
-    printf("--> Se ha gia' un account registrato digiti LOGIN.\n\n-> ");
+    printf("\n\n---> Digiti SIGNUP per creare un account.\n\n");
+    printf("---> Se ha gia' un account registrato digiti LOGIN.\n\n-> ");
 
     while(1){       
         
         scanf("%s", spacenter);
         if(!strcmp(spacenter, "signup") || !strcmp(spacenter,"SIGNUP")){
-            printf("\nREGISTRAZIONE ACCOUNT IN CORSO\n\n");
+            printf("\n---> Registrazione account in corso...\n\n");
             // La funzione si occupa di tutta la fase di registrazione comprensiva di richiesta di username e password
             reg_config(srv_sd);
-            printf("\nIL SUO ACCOUNT E' STATO REGISTRATO CORRETTAMENTE\n\n");
+            printf("\n---> Il suo account e' stato registrato correttamente\n\n");
             break;
 
         } else if(!strcmp(spacenter, "login") || !strcmp(spacenter, "LOGIN")){
-            printf("Gestione login\n");
+            // printf("Gestione login\n");
             // La funzione si occupa di tutta la fase di login
             // E' una booleana: se ritorna true vuol dire che l'utente vuole fare la signup
             if(log_config(srv_sd)){
-                    printf("\nREGISTRAZIONE ACCOUNT IN CORSO\n\n");
+                    printf("\n---> Registrazione account in corso...\n\n");
                     // La funzione si occupa di tutta la fase di registrazione comprensiva di richiesta di username e password
                     reg_config(srv_sd);
-                    printf("\nIL SUO ACCOUNT E' STATO REGISTRATO CORRETTAMENTE\n\n");
+                    printf("\n---> Il suo account e' stato registrato correttamente\n\n");
             }
             break;
         }
