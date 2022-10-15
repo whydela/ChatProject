@@ -101,7 +101,7 @@ void reg_config(int sd){
     send_srv(sd, CMD_REG);
 
     while(1){
-        printf("Inserisci un username:\n");
+        printf("Inserisca un username:\n-> ");
         scanf("%s", username);
         //Mando l'username al server, lui controllera' se va bene
         send_srv(sd, username);
@@ -112,13 +112,11 @@ void reg_config(int sd){
             printf("\nATTENZIONE! Username gia' in uso\n\n");
             continue;
         } else{
-            // Altrimenti registra l'username e il device lo comunica
-            printf("\nUsername registrato\n\n");
             break;
         }
     }
 
-    printf("Inserisci una password:\n");
+    printf("Inserisca una password:\n-> ");
     scanf("%s", password);
     
     // Invio al server l'username e la password insieme
@@ -138,7 +136,7 @@ bool log_config(int sd){
 
     send_srv(sd, CMD_LOG);
 
-    printf("Inserisca l'username:\n");
+    printf("Inserisca l'username:\n-> ");
 
     while(1){
 
@@ -168,7 +166,7 @@ bool log_config(int sd){
         }
     }
 
-    printf("Inserisca la password:\n");
+    printf("Inserisca la password:\n-> ");
 
     while(1){
 
@@ -235,7 +233,7 @@ int main(int argc, char* argv[]){
     //printf("\nDevice connesso al server\n");  
 
     printf("\n--> Digiti SIGNUP per creare un account.\n\n");
-    printf("--> Se ha gia' un account registrato digiti LOGIN.\n\n");
+    printf("--> Se ha gia' un account registrato digiti LOGIN.\n\n-> ");
 
     while(1){       
         
