@@ -19,7 +19,7 @@
 #define YES "/YES\0"
 #define NO "/NO\0"
 
-
+// Grazie pippo
 
 void first_print(){
     int i;
