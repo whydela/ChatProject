@@ -1,4 +1,4 @@
-all: Device Server
+all: device server
 
 server: Server.c
 	gcc -Wall Server.c -o Server

@@ -34,7 +34,7 @@ void first_print(){
     for(i=0; i < 190; i++){
         printf("*");
     }
-    printf("\n\n\nInserisci un comando:\n");
+    printf("\n\n\nSi prega di inserire un comando:\n");
     printf("\n- list: Mostra gli utenti online.\n");
     printf("- esc:  Chiude il server.\n");
     printf("\n(Digitare help per i dettagli dei comandi)\n\n");
@@ -315,6 +315,27 @@ void dev_online(int sd){
 
 }
 
+void srv_list(){
+
+    char buffer[1024];
+
+    FILE* fptr = fopen("srv/usr_log.txt", "r");
+
+    if(!fptr){
+        printf("Nessun utente e' attualmente online\n");
+        return;
+    }
+
+    printf("\nLista degli utenti online:\n\n");
+    
+    while(fscanf(fptr, "%s", buffer)==1){
+        printf("%s\n", buffer);
+    }
+
+    fclose(fptr);
+
+}
+
 int main(int argc, char *argv[]) {
     // Dichiarazioni Variabili
 
@@ -335,7 +356,6 @@ int main(int argc, char *argv[]) {
     
     // Questa funzione si occupa della prima stampa a video
     first_print();
-
 
     // Si inizializza la porta del Server, atoi converte da char ad intero
     port = (argc > 1) ? atoi(argv[1]) : 4242;
@@ -385,7 +405,29 @@ int main(int argc, char *argv[]) {
 
                 if(!i){                                     // Quello pronto riguarda la stdin
                     scanf("%s", buffer);
-                    printf("Gestione comando '%s'\n\n", buffer);
+
+                    if(!strcmp(buffer, "list")){
+                        // Gestione comando list
+                        srv_list();
+                    }
+
+                    else if(!strcmp(buffer, "esc")){
+                        // Gestione comando esc
+                        // Per ora esco
+                        exit(0);
+                    }
+                    else if(!strcmp(buffer, "help")){
+                        // Gestione comando help
+
+                    }
+
+                    else{
+                        printf("\nATTENZIONE ! Comando -%s- inesistente.\n", buffer);
+                        printf("\nSi prega di inserire un comando:\n");
+                        printf("\n- list: Mostra gli utenti online.\n");
+                        printf("- esc:  Chiude il server.\n");
+                        printf("\n(Digitare help per i dettagli dei comandi)\n\n");
+                    }
                 }
 
                 else if(i == listener) {                    // Se quello pronto e' il listener

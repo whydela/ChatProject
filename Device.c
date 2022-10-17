@@ -17,6 +17,7 @@
 #define CMD_TMS "/TIMESTAMP\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
+#define STDIN 0
 
 char username[1024];                    // username del device
 char password[1024];                    // password del device
@@ -248,15 +249,31 @@ void online_config(int sd, int port){
 
 }
 
+void second_print(){
+    printf("Benvenuto nel sistema di chatting.\n");
+    printf("\nSi prega di inserire un comando:\n\n");
+    printf("- hanging: per vedere gli utenti che hanno inviato messaggi mentre era offline.\n");
+    printf("- show 'username': per ricevere i messaggi pendenti inviati da 'username'.\n");
+    printf("- chat 'username': per iniziare una chat con 'username'.\n");
+    printf("- out: per disconnettersi dal Server.\n\n");
+    printf("(Digitare help per i dettagli dei comandi)\n\n");
+}
+
 int main(int argc, char* argv[]){
 
     int ret, my_sd, port, srv_sd, srv_port;
     struct sockaddr_in my_addr, srv_addr;
     char spacenter[1024];
-    //char buffer[1024];
+    fd_set master;                                  // Set principale gestito dal programmatore con le macro 
+    fd_set read_fds;                                // Set di lettura gestito dalla select 
+    int fdmax;                                      // Numero max di descrittori
+    int listener;                                   // Socket di ascolto
+    int newfd;                                      // Socket di comunicazione
+    char buffer[1024];
+    int i;
 
     if(argc < 2){
-        printf("Inserisca una porta\n");
+        printf("ATTENZIONE! Inserisca una porta.\n");
         exit(-1);
     }
 
@@ -285,6 +302,17 @@ int main(int argc, char* argv[]){
         break;
     }
 
+     // Azzero i set
+    FD_ZERO(&master);
+    FD_ZERO(&read_fds); 
+    
+    // Aggiungo il listener al set master
+    FD_SET(listener, &master);
+    // Aggiungo il descrittore della STDIN al set master
+    FD_SET(STDIN, &master);
+
+    // Il socket maggiore sara' il listener
+    fdmax = listener;
 
     // Prima stampa
     first_print();
@@ -327,8 +355,58 @@ int main(int argc, char* argv[]){
     printf("\nDevice ONLINE !\n");
 
     // Adesso il Device e' online, dobbiamo inviare al Server il timestamp corrente
-    sleep(1);
     online_config(srv_sd, port);
+    
+    // Il Device si e' loggato, bisogna creare il menu' di comparsa
+    second_print();
+
+    while(1){
+
+        read_fds = master;
+
+        printf("Parte il ciclo e chiamo la select\n");
+        select(fdmax + 1, &read_fds, NULL, NULL, NULL);
+
+        for(i=0; i<=fdmax; i++) {
+            // Cerco quelli pronti
+            if(FD_ISSET(i, &read_fds)) {
+                if(!i){
+                    scanf("%s", buffer);
+
+                    if(!strcmp(buffer, "hanging")){
+                        // Gestione comando hanging
+                        printf("Gestione comando %s\n", buffer);
+                    }
+
+                    else if(!strcmp(buffer, "show")){
+                        // Gestione comando show
+                        printf("Gestione comando %s\n", buffer);
+                        scanf("%s", buffer);
+                        printf("%s\n", buffer);
+                    }
+
+                    else if(!strcmp(buffer, "chat")){
+                        // Gestione comando chat
+                        printf("Gestione comando %s\n", buffer);
+                        scanf("%s", buffer);
+                        printf("%s\n", buffer);
+                    }
+
+                    else if(!strcmp(buffer, "out")){
+                        // Gestione comando out
+                        // Per ora esco
+                        exit(0);
+                    }
+
+                    else{
+                        printf("\nATTENZIONE ! Comando -%s- inesistente.\n", buffer);
+                        second_print();
+                    }
+
+                }
+            } 
+        }
+     }
 
     sleep(60);
 
