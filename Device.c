@@ -229,6 +229,7 @@ void online_config(int sd, int port){
 
     // Invio comando
     send_srv(sd, CMD_TMS);
+
     sleep(1);
     // Invio username online
     send_srv(sd, username);
@@ -237,7 +238,7 @@ void online_config(int sd, int port){
     // Converto l'ora
     timeinfo = localtime(&rawtime);
     // Creo la risposta mettendola in "timestamp"
-    sprintf(timestamp, "%d-%d-%d/%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
+    sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
     timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
     sprintf(buffer, "%s*%s*%d", username, timestamp, port);
     sleep(1);
@@ -326,6 +327,7 @@ int main(int argc, char* argv[]){
     printf("\nDevice ONLINE !\n");
 
     // Adesso il Device e' online, dobbiamo inviare al Server il timestamp corrente
+    sleep(1);
     online_config(srv_sd, port);
 
     sleep(60);

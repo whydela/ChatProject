@@ -55,6 +55,8 @@ int ip_config(struct sockaddr_in* addr, int port){
     (*addr).sin_port = htons(port);
     (*addr).sin_addr.s_addr = INADDR_ANY;
 
+    setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+
     // Aggancio dell'indirizzo
     ret = bind(sd, (struct sockaddr*)addr, sizeof(*addr));
 
@@ -146,7 +148,10 @@ void dev_reg(int sd){
         // Facciamo in modo che i permessi siano attivi solo per l'owner del file
         // Come se il server avesse delle informazioni non accessibili dai device
         chmod("srv/usr_all.txt", S_IRWXU);
-        fclose(fptr);
+
+        if(fptr){
+            fclose(fptr);
+        }
 
         // Adesso gestiamo la password
         recv(sd, password, sizeof(password), 0);
@@ -159,7 +164,9 @@ void dev_reg(int sd){
         // Facciamo in modo che i permessi siano attivi solo per l'owner del file
         // Come se il server avesse delle informazioni non accessibili dai device
         chmod("srv/usr_psw.txt", S_IRWXU);
-        fclose(fptr);
+        if(fptr){
+            fclose(fptr);
+        }
 
         break;
     }
@@ -213,7 +220,9 @@ bool dev_log(int sd){
             continue;
         }
 
-        fclose(fptr);
+        if(fptr){
+            fclose(fptr);
+        }
 
         break;
     }
@@ -246,7 +255,9 @@ bool dev_log(int sd){
                 continue;
             }
 
-            fclose(fptr);
+            if(fptr){
+                fclose(fptr);
+            }
             break;        
 
     }
@@ -279,7 +290,10 @@ void dev_online(int sd){
     }
 
     chmod("srv/usr_online.txt", S_IRWXU);
-    fclose(fptr);
+
+    if(fptr){
+        fclose(fptr);
+    }
 
     // Ricevo timestamp
     recv(sd, timestamp, sizeof(buffer), 0);
@@ -293,8 +307,11 @@ void dev_online(int sd){
         fprintf(fptr, "%s\n", timestamp);
     }
     chmod("srv/usr_log.txt", S_IRWXU);
-        
-    fclose(fptr);
+
+
+    if(fptr){
+        fclose(fptr);
+    }
 
 }
 
