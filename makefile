@@ -6,3 +6,5 @@ server: Server.c
 device: Device.c
 	gcc -Wall Device.c -o Device
 
+reset:
+	rm *o Device Server
