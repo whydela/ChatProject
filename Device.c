@@ -222,7 +222,6 @@ bool log_config(int sd){
 }
 
 void online_config(int sd, int port){
-    
 
     char buffer[1024];
     time_t rawtime;
@@ -238,7 +237,8 @@ void online_config(int sd, int port){
     // Converto l'ora
     timeinfo = localtime(&rawtime);
     // Creo la risposta mettendola in "timestamp"
-    sprintf(timestamp, "%d:%d:%d", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+    sprintf(timestamp, "%d-%d-%d/%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
+    timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
     sprintf(buffer, "%s*%s*%d", username, timestamp, port);
     sleep(1);
     send_srv(sd, buffer);
@@ -284,7 +284,6 @@ int main(int argc, char* argv[]){
         break;
     }
 
-    // epepep
 
     // Prima stampa
     first_print();
