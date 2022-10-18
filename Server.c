@@ -16,6 +16,7 @@
 #define CMD_REG "/REG\0"
 #define CMD_LOG "/LOGIN\0"
 #define CMD_TMS "/TIMESTAMP\0"
+#define CMD_CHAT "/CHAT\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
 
@@ -272,21 +273,41 @@ void dev_online(int sd){
 
     char buffer[1024];
     char timestamp[1024];
-
+    char username[1024];
+    int port;
+    time_t rawtime;
+    struct tm * timeinfo;
     bool online;
-
     FILE* fptr;
 
     // Ricevo username
-    recv(sd, buffer, sizeof(buffer), 0);
-    printf("Ricevuto %s\n", buffer);
+    recv(sd, username, sizeof(username), 0);
+    printf("Ricevuto %s\n", username);
+
+    time(&rawtime);
+
+    // Converto l'ora
+    timeinfo = localtime(&rawtime);
+
+    // Creo il timestamp
+    sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
+    timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 
     fptr = fopen("srv/usr_online.txt", "a+");
-    online = check_word(fptr, buffer);
+    online = check_word(fptr, username);
+
     if(!online){
-        printf("Entro e scrivo\n");
-        fptr = fopen("srv/usr_online.txt", "a");
-        fprintf(fptr, "%s\n", buffer);
+        send_dv(sd, NO);
+        recv(sd, &port, sizeof(port), 0);
+        //fptr = fopen("srv/usr_online.txt", "a");
+        fprintf(fptr, "%s\n", username);
+        fprintf(fptr, "%d\n", port);
+        fprintf(fptr, "%s\n", timestamp);
+        // Indica che l'utente non ha ancora effettuato il log out
+        fprintf(fptr, "%d\n", 0);
+    }
+    else{
+        send_dv(sd, YES);
     }
 
     chmod("srv/usr_online.txt", S_IRWXU);
@@ -295,19 +316,20 @@ void dev_online(int sd){
         fclose(fptr);
     }
 
-    // Ricevo timestamp
-    recv(sd, timestamp, sizeof(buffer), 0);
     printf("Ricevuto %s\n", timestamp);
+
+    sprintf(buffer, "%s*%s*%d", username, timestamp, port);
 
     // Creo/apro un file contenente tutti gli username registrati
     // Lo apro in scrittura perche' nel caso in cui ci sia un tentativo di login come primo comando in assoluto,
     // aprire il file in sola lettura non implica la sua creazione, ciò provocherebbe una crisi di consistenza
     fptr = fopen("srv/usr_log.txt", "a+");
-    if(!online){
-        fprintf(fptr, "%s\n", timestamp);
-    }
-    chmod("srv/usr_log.txt", S_IRWXU);
 
+    if(!online){
+        fprintf(fptr, "%s\n", buffer);
+    }
+
+    chmod("srv/usr_log.txt", S_IRWXU);
 
     if(fptr){
         fclose(fptr);
@@ -329,12 +351,31 @@ void srv_list(){
     printf("\nLista degli utenti online:\n\n");
     
     while(fscanf(fptr, "%s", buffer)==1){
-        printf("%s\n", buffer);
+        printf("- %s\n", buffer);
     }
 
     fclose(fptr);
 
 }
+
+void srv_help(){
+
+    printf("\n--> Il comando 'list' permette di vedere la lista degli utenti online");
+    printf(" nel formato username*timestamp*port:\n\n");
+    
+    printf("\t- 'username'  -> rappresenta l'id dell'utente online.\n");
+    printf("\t- 'timestamp' -> rappresenta l'istante in cui l'utente si e'");
+    printf(" loggato nel sistema nel formato dd-mm-yyyy|hh-mm-ss.\n");
+    printf("\t- 'port'      -> rappresenta la porta a cui si e' collegato l'username corrente.\n");
+
+    printf("\n--> Il comando 'esc' permette di terminare il Server.\n\n");
+    printf("\t- La disconnessione del Server non implica un'interruzione di");
+    printf(" servizio per i Device che stanno comunicando tra loro.\n");
+    printf("\t- Un Device non puo' loggarsi con il Server spento.\n\n");
+    
+}
+
+
 
 int main(int argc, char *argv[]) {
     // Dichiarazioni Variabili
@@ -378,10 +419,8 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-
     // Creo la cartella del Server
     mkdir("srv", 0700);
-    
 
     // Aggiungo il listener al set master
     FD_SET(listener, &master);
@@ -395,8 +434,8 @@ int main(int argc, char *argv[]) {
     while(1){
 
         read_fds = master;
-
-        printf("Parte il ciclo e chiamo la select\n");
+        printf("Parte il ciclo e chiamo la select\n\n");
+        
         select(fdmax + 1, &read_fds, NULL, NULL, NULL);
 
         for(i=0; i<=fdmax; i++) {
@@ -405,7 +444,6 @@ int main(int argc, char *argv[]) {
 
                 if(!i){                                     // Quello pronto riguarda la stdin
                     scanf("%s", buffer);
-
                     if(!strcmp(buffer, "list")){
                         // Gestione comando list
                         srv_list();
@@ -416,9 +454,10 @@ int main(int argc, char *argv[]) {
                         // Per ora esco
                         exit(0);
                     }
+
                     else if(!strcmp(buffer, "help")){
                         // Gestione comando help
-
+                        srv_help();
                     }
 
                     else{
@@ -475,10 +514,17 @@ int main(int argc, char *argv[]) {
                                 continue;
                             }
                         }
+
                         // Gestione timestamp
                         else if(!strcmp(command, CMD_TMS)){
                             printf("Gestione timestamp\n");
                             dev_online(i);
+                        }
+
+                        // Gestione chat
+                        else if(!strcmp(command, CMD_CHAT)){
+                            printf("Gestione chat");
+
                         }
                     } else{
                         perror("Errore nella reiceve: ");

@@ -15,6 +15,7 @@
 #define CMD_REG "/REG\0"
 #define CMD_LOG "/LOGIN\0"
 #define CMD_TMS "/TIMESTAMP\0"
+#define CMD_CHAT "/CHAT\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
 #define STDIN 0
@@ -37,6 +38,22 @@ void first_print(){
     for(i=0; i < 190; i++){
         printf("*");
     }    
+}
+
+bool check_word(FILE* ptr, char stringa[1024]){
+
+    printf("Checkiamo la parola %s\n", stringa);
+
+    char buffer[1024];
+
+    while(fscanf(ptr, "%s", buffer)==1){
+        printf("Trovo %s\n", buffer);
+        if(strstr(buffer, stringa)){
+            return true;
+        }
+    }
+
+    return false;
 }
 
 int ip_config(struct sockaddr_in* addr, int port){
@@ -225,38 +242,50 @@ bool log_config(int sd){
 void online_config(int sd, int port){
 
     char buffer[1024];
-    time_t rawtime;
-    struct tm * timeinfo;
 
     // Invio comando
     send_srv(sd, CMD_TMS);
 
     sleep(1);
+
     // Invio username online
     send_srv(sd, username);
 
-    time(&rawtime);
-    // Converto l'ora
-    timeinfo = localtime(&rawtime);
-    // Creo la risposta mettendola in "timestamp"
-    sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
-    timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-    sprintf(buffer, "%s*%s*%d", username, timestamp, port);
-    sleep(1);
-    send_srv(sd, buffer);
-    strcpy(timestamp, buffer);
+    // Se non e' online
+    recv(sd, buffer, sizeof(buffer), 0);
 
+    // Invio la porta dell'username 
+    if(!strcmp(buffer, NO)){
+        send(sd, &port, sizeof(port), 0);
+    }
+
+    //sprintf(buffer, "%s*%s*%d", username, timestamp, port);
+    strcpy(timestamp, buffer);
 
 }
 
 void second_print(){
-    printf("Benvenuto nel sistema di chatting.\n");
     printf("\nSi prega di inserire un comando:\n\n");
     printf("- hanging: per vedere gli utenti che hanno inviato messaggi mentre era offline.\n");
     printf("- show 'username': per ricevere i messaggi pendenti inviati da 'username'.\n");
     printf("- chat 'username': per iniziare una chat con 'username'.\n");
     printf("- out: per disconnettersi dal Server.\n\n");
     printf("(Digitare help per i dettagli dei comandi)\n\n");
+}
+
+void chat_config(){
+
+    char file_name[1024];
+    FILE* fptr;
+
+    sprintf(file_name,"%s/dev_usr.txt", username);
+
+    fptr = fopen(file_name, "r");
+
+    if(!fptr){
+        printf("ATTENZIONE ! Nessun username ")
+    }
+
 }
 
 int main(int argc, char* argv[]){
@@ -267,10 +296,11 @@ int main(int argc, char* argv[]){
     fd_set master;                                  // Set principale gestito dal programmatore con le macro 
     fd_set read_fds;                                // Set di lettura gestito dalla select 
     int fdmax;                                      // Numero max di descrittori
-    int listener;                                   // Socket di ascolto
-    int newfd;                                      // Socket di comunicazione
+    //int listener;                                   // Socket di ascolto
+    //int newfd;                                      // Socket di comunicazione
     char buffer[1024];
     int i;
+    
 
     if(argc < 2){
         printf("ATTENZIONE! Inserisca una porta.\n");
@@ -307,12 +337,12 @@ int main(int argc, char* argv[]){
     FD_ZERO(&read_fds); 
     
     // Aggiungo il listener al set master
-    FD_SET(listener, &master);
+    //FD_SET(listener, &master);
     // Aggiungo il descrittore della STDIN al set master
     FD_SET(STDIN, &master);
 
-    // Il socket maggiore sara' il listener
-    fdmax = listener;
+    // Il socket maggiore
+    fdmax = STDIN;
 
     // Prima stampa
     first_print();
@@ -357,8 +387,13 @@ int main(int argc, char* argv[]){
     // Adesso il Device e' online, dobbiamo inviare al Server il timestamp corrente
     online_config(srv_sd, port);
     
+    printf("Benvenuto nel sistema di chatting.\n");
+
     // Il Device si e' loggato, bisogna creare il menu' di comparsa
     second_print();
+
+    // Creiamo la cartella dell'username
+    //mkdir(username, 0700);
 
     while(1){
 
@@ -388,8 +423,7 @@ int main(int argc, char* argv[]){
                     else if(!strcmp(buffer, "chat")){
                         // Gestione comando chat
                         printf("Gestione comando %s\n", buffer);
-                        scanf("%s", buffer);
-                        printf("%s\n", buffer);
+                        chat_config();
                     }
 
                     else if(!strcmp(buffer, "out")){
