@@ -17,10 +17,14 @@
 #define CMD_LOG "/LOGIN\0"
 #define CMD_TMS "/TIMESTAMP\0"
 #define CMD_CHAT "/CHAT\0"
+#define CMD_OFF "/OFF"
 #define YES "/YES\0"
 #define NO "/NO\0"
 
 char buffer[1024];
+
+int riga=0;
+int colonna=0;
 
 void first_print(){
     int i;
@@ -298,6 +302,8 @@ void dev_online(int sd){
     bool online;
     FILE* fptr;
 
+    tabella[riga][colonna] = username;
+    colonna++;
     // Ricevo username
     recv(sd, username, sizeof(username), 0);
     printf("Ricevuto %s\n", username);
@@ -336,7 +342,8 @@ void dev_online(int sd){
 
     printf("Ricevuto %s\n", timestamp);
 
-    sprintf(buffer, "%s*%s*%d", username, timestamp, port);
+
+    sprintf(buffer, "%s\n%s\n%d", username, timestamp, port);
 
     // Creo/apro un file contenente tutti gli username registrati
     // Lo apro in scrittura perche' nel caso in cui ci sia un tentativo di login come primo comando in assoluto,
@@ -352,23 +359,67 @@ void dev_online(int sd){
     if(fptr){
         fclose(fptr);
     }
-
+    riga++;
 }
+
+void crea_rubrica(int sd){
+    
+    //char buffer[1024];
+    char username[1024];
+    char scorre[1024];
+    char rubrica[1024];
+
+    FILE* fptr, *fpptr;
+
+    fptr = fopen("srv/usr_all.txt", "r");
+    fpptr = fopen("srv/usr_online.txt", "r");
+    
+    recv(sd, username, sizeof(username), 0);
+
+    memset(rubrica, 0, sizeof(rubrica));
+
+    while(fscanf(fptr, "%s", scorre)==1){
+        if(!strcmp(scorre, username)){
+            continue;
+        }
+        printf("%s\n", scorre);
+        if(check_word(fpptr, scorre)){
+           strcat(scorre, ", ONLINE.");
+        }
+        else{
+            strcat(scorre, ", OFFLINE.");
+        }
+        strcat(scorre, "\n");
+        strcat(rubrica, scorre);
+    }
+
+    send_dv(sd, rubrica);
+}
+
 
 void dev_chat(int sd){
 
     // Preparo la rubrica
-    char buffer[1024];
-    char username[1024];
-    FILE* fptr;
+    crea_rubrica(sd);
+    //char buffer[1024];
+    //char username[1024];
+    //FILE* fptr;
 
-    fptr = fopen("srv/usr_all.txt", "r");
-    
+
+}
+
+void dev_out(int sd){
+
+    char username[1024];
+    FILE* fptr, *fpptr;
+
     recv(sd, username, sizeof(username), 0);
 
-    strcpy(buffer, filetobuffer(fptr, username));
+    printf("%s sta andando OFFLINE !\n", username);
 
-    send_dv(sd, buffer);
+    // Modifico i file
+
+    fptr = fopen()
 
 }
 
@@ -386,7 +437,11 @@ void srv_list(){
     printf("\nLista degli utenti online:\n\n");
     
     while(fscanf(fptr, "%s", buffer)==1){
-        printf("- %s\n", buffer);
+        int i = 0;
+        while(i < 3){
+            printf("%s*", buffer);
+            i++;
+        }
     }
 
     fclose(fptr);
@@ -410,8 +465,6 @@ void srv_help(){
     
 }
 
-
-
 int main(int argc, char *argv[]) {
     // Dichiarazioni Variabili
 
@@ -426,6 +479,7 @@ int main(int argc, char *argv[]) {
     int newfd;                                      // Socket di comunicazione
     char command[1024];
     char buffer[1024];
+    char tabella[1024][1024];
     int i;
     int addrlen;
 
@@ -560,6 +614,12 @@ int main(int argc, char *argv[]) {
                         else if(!strcmp(command, CMD_CHAT)){
                             printf("Gestione chat\n");
                             dev_chat(i);
+                        }
+
+                        else if(!strcmp(command, CMD_OFF)){
+                            printf("Gestione out\n");
+                            dev_out(i);
+                            close(i);
                         }
                     } else{
                         perror("Errore nella reiceve: ");

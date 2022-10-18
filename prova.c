@@ -11,24 +11,44 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 
-int main(){
+bool check_word(FILE* ptr, char stringa[1024]){
 
-    FILE* fptr;
+    printf("Checkiamo la parola %s\n", stringa);
+
     char buffer[1024];
-    char stringa[1024];
-    fptr = fopen("prova.txt", "r+");
 
-    strcpy(stringa, "solo");
-
-    while(fscanf(fptr, "%s", buffer)==1){
-        printf("%s\n", buffer);
-        if(!strcmp(buffer, "dylan")){
-            freopen(NULL, "r+", fptr);
-            fprintf(fptr, "%s", stringa);
+    while(fscanf(ptr, "%s", buffer)==1){
+        printf("Trovo %s\n", buffer);
+        if(strstr(buffer, stringa)){
+            return true;
         }
     }
 
-    //printf("%s", stringa);
+    return false;
+}
+
+int main(){
+
+    FILE* fptr, fpptr;
+    char buffer[1024];
+    char stringa[1024];
+    
+    fptr = fopen("srv/usr_online.txt", "r");
+    //strcpy(buffer, "luppi\ndylan\nvero\ntalpa\n");
+        
+    while(fscanf(fptr, "%s", buffer)==1){
+        int i = 0;
+        strcat(buffer, "*");
+        while(i < 3){
+            fscanf(fptr, "%s", stringa);
+            strcat(buffer, stringa);
+            if(i!=2){
+                strcat(buffer, "*");
+            }
+            i++;
+        }
+        printf("%s\n", buffer);
+    }
 
 
 

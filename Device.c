@@ -16,6 +16,7 @@
 #define CMD_LOG "/LOGIN\0"
 #define CMD_TMS "/TIMESTAMP\0"
 #define CMD_CHAT "/CHAT\0"
+#define CMD_OFF "/OFF"
 #define YES "/YES\0"
 #define NO "/NO\0"
 #define STDIN 0
@@ -23,6 +24,9 @@
 char username[1024];                    // username del device
 char password[1024];                    // password del device
 char timestamp[1024];                   // username*timestamp*porta del device
+char percorso[1024];                    // percorso: username/file.txt
+char rubrica[1024];                     // rubrica
+
 bool wait = false;
 
 void first_print(){
@@ -74,7 +78,7 @@ int ip_config(struct sockaddr_in* addr, int port){
     ret = bind(sd, (struct sockaddr*)addr, sizeof(*addr));
 
     if(ret < 0){
-        printf("Si prega di inserire una porta corretta\n");
+        printf("\nATTENZIONE ! Porta non corretta o gia' utilizzata da un altro device !\n\n");
         exit(-1); 
     }
 
@@ -278,8 +282,7 @@ void second_print(){
 
 void chat_config(int sd){
 
-    //char file_name[1024];
-    char buffer[1024];
+    FILE* fptr;
 
     // Mandiamo il comando
     send_srv(sd, CMD_CHAT);
@@ -287,15 +290,33 @@ void chat_config(int sd){
     //sleep(1);
     send_srv(sd, username);
 
+
     // Ricevo la rubrica
-    recv(sd, buffer, sizeof(buffer), 0);
-    
+    recv(sd, rubrica, sizeof(rubrica), 0);
+
     printf("Rubrica degli utenti registrati nel sistema:\n\n");
-
-    printf("%s", buffer);
-
+    printf("%s\n", rubrica);
 
 
+    strcat(percorso, "/");
+    strcat(percorso, "rubrica.txt");
+    fptr = fopen(percorso, "w+");
+    fflush(fptr);
+    fprintf(fptr, "%s", rubrica);
+    fclose(fptr);
+
+}
+
+void config_offline(int sd){
+
+    send_srv(sd, CMD_OFF);
+
+    sleep(1);
+    send_srv(sd, username);
+    strcat(percorso, "/rubrica.txt");
+    
+    remove(percorso);
+    rmdir(username);
 }
 
 int main(int argc, char* argv[]){
@@ -359,8 +380,8 @@ int main(int argc, char* argv[]){
 
     //printf("\nDevice connesso al server\n");  
 
-    printf("\n\n---> Digiti SIGNUP per creare un account.\n\n");
-    printf("---> Se ha gia' un account registrato digiti LOGIN.\n\n-> ");
+    printf("\n\n---> Digiti 'signup' per creare un account.\n\n");
+    printf("---> Se ha gia' un account registrato digiti 'login'.\n\n-> ");
 
     while(1){       
         
@@ -397,16 +418,19 @@ int main(int argc, char* argv[]){
     // Adesso il Device e' online, dobbiamo inviare al Server il timestamp corrente
     online_config(srv_sd, port);
     
-    printf("Benvenuto nel sistema di chatting.\n");
+    printf("Salve %s ! Benvenuto nel sistema di chatting.\n", username);
 
     // Il Device si e' loggato, bisogna creare il menu' di comparsa
     second_print();
 
     // Creiamo la cartella dell'username
-    //mkdir(username, 0700);
+    mkdir(username, 0700);
+
 
     while(1){
 
+        strcpy(percorso, username);
+        //strcat(percorso, "/");
         read_fds = master;
 
         printf("Parte il ciclo e chiamo la select\n");
@@ -439,6 +463,7 @@ int main(int argc, char* argv[]){
                     else if(!strcmp(buffer, "out")){
                         // Gestione comando out
                         // Per ora esco
+                        config_offline(srv_sd);
                         exit(0);
                     }
 
