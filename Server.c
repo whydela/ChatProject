@@ -20,6 +20,7 @@
 #define YES "/YES\0"
 #define NO "/NO\0"
 
+char buffer[1024];
 
 void first_print(){
     int i;
@@ -84,6 +85,23 @@ bool check_word(FILE* ptr, char stringa[1024]){
     }
 
     return false;
+}
+
+char* filetobuffer(FILE* fptr, char stringa[1024]){
+
+    char scorre[1024];
+
+    memset(buffer, 0, sizeof(*buffer));         // Pulizia della variabile globale
+    while(fscanf(fptr, "%s", scorre)==1){
+        if(!strcmp(scorre, stringa)){
+            continue;
+        }
+        strcat(scorre, "\n");
+        strcat(buffer, scorre);
+    }
+
+    return buffer;
+
 }
 
 void send_dv(int sd, char* cmd){
@@ -337,6 +355,23 @@ void dev_online(int sd){
 
 }
 
+void dev_chat(int sd){
+
+    // Preparo la rubrica
+    char buffer[1024];
+    char username[1024];
+    FILE* fptr;
+
+    fptr = fopen("srv/usr_all.txt", "r");
+    
+    recv(sd, username, sizeof(username), 0);
+
+    strcpy(buffer, filetobuffer(fptr, username));
+
+    send_dv(sd, buffer);
+
+}
+
 void srv_list(){
 
     char buffer[1024];
@@ -523,8 +558,8 @@ int main(int argc, char *argv[]) {
 
                         // Gestione chat
                         else if(!strcmp(command, CMD_CHAT)){
-                            printf("Gestione chat");
-
+                            printf("Gestione chat\n");
+                            dev_chat(i);
                         }
                     } else{
                         perror("Errore nella reiceve: ");

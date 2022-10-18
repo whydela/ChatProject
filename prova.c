@@ -12,12 +12,24 @@
 #include <sys/stat.h>
 
 int main(){
-    time_t rawtime;
-    struct tm * timeinfo;
 
-    time(&rawtime);
-    // Converto l'ora
-    timeinfo = localtime(&rawtime);
+    FILE* fptr;
+    char buffer[1024];
+    char stringa[1024];
+    fptr = fopen("prova.txt", "r+");
 
-    printf("%d\n", timeinfo->tm_year+1900);
+    strcpy(stringa, "solo");
+
+    while(fscanf(fptr, "%s", buffer)==1){
+        printf("%s\n", buffer);
+        if(!strcmp(buffer, "dylan")){
+            freopen(NULL, "r+", fptr);
+            fprintf(fptr, "%s", stringa);
+        }
+    }
+
+    //printf("%s", stringa);
+
+
+
 }

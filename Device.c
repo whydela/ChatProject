@@ -23,6 +23,7 @@
 char username[1024];                    // username del device
 char password[1024];                    // password del device
 char timestamp[1024];                   // username*timestamp*porta del device
+bool wait = false;
 
 void first_print(){
     int i;
@@ -174,7 +175,7 @@ bool log_config(int sd){
         scanf("%s", username);
         i++;
         //printf("%d", i);
-        // Mando l'username al server, lui controllera' se va bene
+        //Mando l'username al server, lui controllera' se va bene
         send_srv(sd, username);
 
         if(!(strcmp(username, "signup")) && i){
@@ -234,7 +235,7 @@ bool log_config(int sd){
             break;
         }
     }
-    
+    wait=true;
     return false;
 
 }
@@ -246,7 +247,9 @@ void online_config(int sd, int port){
     // Invio comando
     send_srv(sd, CMD_TMS);
 
-    sleep(1);
+    if(!wait){
+        sleep(1);
+    }
 
     // Invio username online
     send_srv(sd, username);
@@ -273,18 +276,25 @@ void second_print(){
     printf("(Digitare help per i dettagli dei comandi)\n\n");
 }
 
-void chat_config(){
+void chat_config(int sd){
 
-    char file_name[1024];
-    FILE* fptr;
+    //char file_name[1024];
+    char buffer[1024];
 
-    sprintf(file_name,"%s/dev_usr.txt", username);
+    // Mandiamo il comando
+    send_srv(sd, CMD_CHAT);
 
-    fptr = fopen(file_name, "r");
+    //sleep(1);
+    send_srv(sd, username);
 
-    if(!fptr){
-        printf("ATTENZIONE ! Nessun username ")
-    }
+    // Ricevo la rubrica
+    recv(sd, buffer, sizeof(buffer), 0);
+    
+    printf("Rubrica degli utenti registrati nel sistema:\n\n");
+
+    printf("%s", buffer);
+
+
 
 }
 
@@ -423,7 +433,7 @@ int main(int argc, char* argv[]){
                     else if(!strcmp(buffer, "chat")){
                         // Gestione comando chat
                         printf("Gestione comando %s\n", buffer);
-                        chat_config();
+                        chat_config(srv_sd);
                     }
 
                     else if(!strcmp(buffer, "out")){
