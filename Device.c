@@ -11,7 +11,7 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 
-#define SIG_RFD "RFD\0"
+#define RFD "RFD\0"
 #define CMD_REG "/REG\0"
 #define CMD_LOG "/LOGIN\0"
 #define CMD_TMS "/TIMESTAMP\0"
@@ -27,7 +27,8 @@ char timestamp[1024];                   // username*timestamp*porta del device
 char percorso[1024];                    // percorso: username/file.txt
 char rubrica[1024];                     // rubrica
 
-bool wait = false;
+int my_port;                            // porta del device
+
 
 void first_print(){
     int i;
@@ -239,7 +240,6 @@ bool log_config(int sd){
             break;
         }
     }
-    wait=true;
     return false;
 
 }
@@ -247,27 +247,42 @@ bool log_config(int sd){
 void online_config(int sd, int port){
 
     char buffer[1024];
+    time_t rawtime;
+    struct tm * timeinfo;
 
     // Invio comando
     send_srv(sd, CMD_TMS);
 
-    if(!wait){
-        sleep(1);
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(strcmp(buffer, RFD)){
+            continue;
+        }
+        send_srv(sd, username);
+        break;
     }
+    
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(strcmp(buffer, RFD)){
+            continue;
+        }
 
-    // Invio username online
-    send_srv(sd, username);
+        time(&rawtime);
+        // Converto l'ora
+        timeinfo = localtime(&rawtime);
 
-    // Se non e' online
-    recv(sd, buffer, sizeof(buffer), 0);
-
+        sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
+        timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+        break;
+    }
+    //recv(sd, buffer, sizeof(buffer), 0);
     // Invio la porta dell'username 
-    if(!strcmp(buffer, NO)){
+    //if(!strcmp(buffer, NO)){
         send(sd, &port, sizeof(port), 0);
-    }
+    //}
 
     //sprintf(buffer, "%s*%s*%d", username, timestamp, port);
-    strcpy(timestamp, buffer);
 
 }
 
@@ -283,12 +298,19 @@ void second_print(){
 void chat_config(int sd){
 
     FILE* fptr;
+    char buffer[1024];
 
     // Mandiamo il comando
     send_srv(sd, CMD_CHAT);
 
-    //sleep(1);
-    send_srv(sd, username);
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(strcmp(buffer, RFD)){
+            continue;
+        }
+        send_srv(sd, username);
+        break;
+    }
 
 
     // Ricevo la rubrica
@@ -309,19 +331,47 @@ void chat_config(int sd){
 
 void config_offline(int sd){
 
+    char buffer[1024];
+
     send_srv(sd, CMD_OFF);
 
-    sleep(1);
-    send_srv(sd, username);
+    // Bisogna utilizzare RFD
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(strcmp(buffer, RFD)){
+            continue;
+        }
+        send_srv(sd, username);
+        break;
+    }
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(strcmp(buffer, RFD)){
+            continue;
+        }
+        send(sd, &my_port, sizeof(&my_port), 0);
+        break;
+    }
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(strcmp(buffer, RFD)){
+            continue;
+        }
+        send(sd, timestamp, sizeof(timestamp), 0);
+        break;
+    }
+
     strcat(percorso, "/rubrica.txt");
-    
+
     remove(percorso);
     rmdir(username);
 }
 
 int main(int argc, char* argv[]){
 
-    int ret, my_sd, port, srv_sd, srv_port;
+    int ret, my_sd, srv_sd, srv_port;
     struct sockaddr_in my_addr, srv_addr;
     char spacenter[1024];
     fd_set master;                                  // Set principale gestito dal programmatore con le macro 
@@ -339,10 +389,10 @@ int main(int argc, char* argv[]){
     }
 
     // Porta passata dalla linea di comando
-    port = atoi(argv[1]);
+    my_port = atoi(argv[1]);
 
     // Si connette il device alla porta desiderata 
-    my_sd = ip_config(&my_addr, port);
+    my_sd = ip_config(&my_addr, my_port);
     if(my_sd > 10){}
 
 
@@ -416,7 +466,7 @@ int main(int argc, char* argv[]){
     printf("\nDevice ONLINE !\n");
 
     // Adesso il Device e' online, dobbiamo inviare al Server il timestamp corrente
-    online_config(srv_sd, port);
+    online_config(srv_sd, my_port);
     
     printf("Salve %s ! Benvenuto nel sistema di chatting.\n", username);
 

@@ -12,7 +12,7 @@
 #include <sys/stat.h>
 
 #define STDIN 0
-#define RFD "/RFD\0"
+#define RFD "RFD\0"
 #define CMD_REG "/REG\0"
 #define CMD_LOG "/LOGIN\0"
 #define CMD_TMS "/TIMESTAMP\0"
@@ -299,12 +299,12 @@ void dev_online(int sd){
     int port;
     time_t rawtime;
     struct tm * timeinfo;
-    bool online;
     FILE* fptr;
 
-    tabella[riga][colonna] = username;
+    //tabella[riga][colonna] = username;
     colonna++;
     // Ricevo username
+    send_dv(sd, RFD);
     recv(sd, username, sizeof(username), 0);
     printf("Ricevuto %s\n", username);
 
@@ -314,24 +314,24 @@ void dev_online(int sd){
     timeinfo = localtime(&rawtime);
 
     // Creo il timestamp
-    sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
-    timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 
     fptr = fopen("srv/usr_online.txt", "a+");
-    online = check_word(fptr, username);
+    
+    //online = check_word(fptr, username);
 
-    if(!online){
-        send_dv(sd, NO);
-        recv(sd, &port, sizeof(port), 0);
-        //fptr = fopen("srv/usr_online.txt", "a");
+    send_dv(sd, RFD);
+    sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
+    timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+    
+    recv(sd, &port, sizeof(port), 0);
+
+    
+    if(!check_word(fptr, username)){  
         fprintf(fptr, "%s\n", username);
         fprintf(fptr, "%d\n", port);
         fprintf(fptr, "%s\n", timestamp);
         // Indica che l'utente non ha ancora effettuato il log out
         fprintf(fptr, "%d\n", 0);
-    }
-    else{
-        send_dv(sd, YES);
     }
 
     chmod("srv/usr_online.txt", S_IRWXU);
@@ -349,8 +349,8 @@ void dev_online(int sd){
     // Lo apro in scrittura perche' nel caso in cui ci sia un tentativo di login come primo comando in assoluto,
     // aprire il file in sola lettura non implica la sua creazione, ciò provocherebbe una crisi di consistenza
     fptr = fopen("srv/usr_log.txt", "a+");
-
-    if(!online){
+    fflush(fptr);
+    if(!check_word(fptr, username)){
         fprintf(fptr, "%s\n", buffer);
     }
 
@@ -374,6 +374,8 @@ void crea_rubrica(int sd){
     fptr = fopen("srv/usr_all.txt", "r");
     fpptr = fopen("srv/usr_online.txt", "r");
     
+    send_dv(sd, RFD);
+
     recv(sd, username, sizeof(username), 0);
 
     memset(rubrica, 0, sizeof(rubrica));
@@ -396,7 +398,6 @@ void crea_rubrica(int sd){
     send_dv(sd, rubrica);
 }
 
-
 void dev_chat(int sd){
 
     // Preparo la rubrica
@@ -410,22 +411,55 @@ void dev_chat(int sd){
 
 void dev_out(int sd){
 
-    char username[1024];
     FILE* fptr, *fpptr;
+    char username[1024];
+    char timestamp[1024];
+    char buffer[1024];
+    char usr_port[1024];
+    int port;
 
+    send_dv(sd, RFD);
     recv(sd, username, sizeof(username), 0);
 
+    send_dv(sd, RFD);
+    recv(sd, &port, sizeof(&port), 0);
+
+    send_dv(sd, RFD);
+    recv(sd, timestamp, sizeof(timestamp), 0);
+
     printf("%s sta andando OFFLINE !\n", username);
+    printf("%d, %s\n", port, timestamp);
 
     // Modifico i file
+    fptr = fopen("srv/usr_log1.txt", "a");
+    fpptr = fopen("srv/usr_log.txt", "r");
+    fflush(fptr);
+    fflush(fpptr);
 
-    fptr = fopen()
+    sprintf(usr_port, "%d", port);
+
+    while(fscanf(fpptr,"%s", buffer)==1){
+        if(!strcmp(buffer, username) || !strcmp(buffer, usr_port) || !strcmp(buffer, timestamp)){
+            continue;
+        }
+        printf("%s\n", buffer);
+        fprintf(fptr, "%s\n", buffer);
+    }
+
+    remove("srv/usr_log.txt");
+    rename("srv/usr_log1.txt", "srv/usr_log.txt");
+
+    fclose(fptr);
+    fclose(fpptr);
+
+    // log sistemato
 
 }
 
 void srv_list(){
 
     char buffer[1024];
+    char stringa[1024];
 
     FILE* fptr = fopen("srv/usr_log.txt", "r");
 
@@ -438,10 +472,16 @@ void srv_list(){
     
     while(fscanf(fptr, "%s", buffer)==1){
         int i = 0;
-        while(i < 3){
-            printf("%s*", buffer);
+        strcat(buffer, "*");
+        while(i < 2){
+            fscanf(fptr, "%s", stringa);
+            strcat(buffer, stringa);
+            if(i != 1){
+                strcat(buffer, "*");
+            }
             i++;
         }
+        printf("%s\n", buffer);
     }
 
     fclose(fptr);
@@ -479,7 +519,7 @@ int main(int argc, char *argv[]) {
     int newfd;                                      // Socket di comunicazione
     char command[1024];
     char buffer[1024];
-    char tabella[1024][1024];
+    //char tabella[1024][1024];
     int i;
     int addrlen;
 
@@ -619,7 +659,6 @@ int main(int argc, char *argv[]) {
                         else if(!strcmp(command, CMD_OFF)){
                             printf("Gestione out\n");
                             dev_out(i);
-                            close(i);
                         }
                     } else{
                         perror("Errore nella reiceve: ");

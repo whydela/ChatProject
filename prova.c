@@ -29,27 +29,27 @@ bool check_word(FILE* ptr, char stringa[1024]){
 
 int main(){
 
-    FILE* fptr, fpptr;
+    FILE* fptr, *fpptr;
     char buffer[1024];
     char stringa[1024];
     
-    fptr = fopen("srv/usr_online.txt", "r");
+    fflush(fptr);
+    fptr = fopen("srv/usr_log.txt", "r");
+
+    int port = 4245;
+    sprintf(stringa, "%d", port);
     //strcpy(buffer, "luppi\ndylan\nvero\ntalpa\n");
+    fpptr = fopen("pollo.txt", "a");
         
     while(fscanf(fptr, "%s", buffer)==1){
-        int i = 0;
-        strcat(buffer, "*");
-        while(i < 3){
-            fscanf(fptr, "%s", stringa);
-            strcat(buffer, stringa);
-            if(i!=2){
-                strcat(buffer, "*");
-            }
-            i++;
+        if(!strcmp(buffer, stringa) || !strcmp(buffer, "diego") || !strcmp(buffer, "18-10-2022|19:1:17")){
+            continue;
         }
-        printf("%s\n", buffer);
+        fprintf(fpptr, "%s\n", buffer);
     }
+    
+    fclose(fptr);
+    fclose(fpptr);
 
-
-
+    rename("pollo.txt", "mucca.txt");
 }
