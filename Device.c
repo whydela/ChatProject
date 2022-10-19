@@ -294,6 +294,7 @@ void chat_config(int sd){
 
     FILE* fptr;
     char buffer[1024];
+    char dev_usr[1024];
 
     // Mandiamo il comando
     send_srv(sd, CMD_CHAT);
@@ -306,7 +307,6 @@ void chat_config(int sd){
         send_srv(sd, username);
         break;
     }
-
 
     // Ricevo la rubrica
     recv(sd, rubrica, sizeof(rubrica), 0);
@@ -321,6 +321,22 @@ void chat_config(int sd){
     fflush(fptr);
     fprintf(fptr, "%s", rubrica);
     fclose(fptr);
+
+    while(1){
+
+        scanf("%s", dev_usr);
+        fptr = fopen(percorso, "r");
+        fflush(fptr);
+        if(!check_word(fptr, dev_usr)){
+            printf("\nATTENZIONE ! Username non presente.\n");
+            continue;
+        }
+        fclose(fptr);
+        break;
+
+    }
+
+    
 
 }
 

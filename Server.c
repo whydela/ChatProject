@@ -252,6 +252,7 @@ bool dev_log(int sd){
 
     // Adesso gestiamo la password
     while(1){
+
             printf("Gestione password\n");
             recv(sd, password, sizeof(password), 0);
             printf("Ricevuto %s\n", password);
@@ -360,7 +361,6 @@ void dev_online(int sd){
         remove("srv/usr_online.txt");
         rename("srv/usr_online1.txt", "srv/usr_online.txt");
     }
-    
 
     chmod("srv/usr_online.txt", S_IRWXU);
 
@@ -388,7 +388,9 @@ void dev_online(int sd){
     if(fptr){
         fclose(fptr);
     }
+
     riga++;
+
 }
 
 void crea_rubrica(int sd){
@@ -431,10 +433,13 @@ void dev_chat(int sd){
 
     // Preparo la rubrica
     crea_rubrica(sd);
-    //char buffer[1024];
-    //char username[1024];
-    //FILE* fptr;
+    
+    char buffer[1024];
+    char dev_usr[1024];
+    FILE* fptr;
 
+
+    fptr = fopen( , );
 
 }
 
