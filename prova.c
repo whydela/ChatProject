@@ -32,24 +32,38 @@ int main(){
     FILE* fptr, *fpptr;
     char buffer[1024];
     char stringa[1024];
-    
+    char timestamp[1024];
+    int i = 0;
+    time_t rawtime;
+    struct tm * timeinfo;
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
+    timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+    fptr = fopen("srv/usr_online.txt", "r");
     fflush(fptr);
-    fptr = fopen("srv/usr_log.txt", "r");
+    fpptr = fopen("pollo.txt", "a");
+    fflush(fpptr);
 
     int port = 4245;
-    sprintf(stringa, "%d", port);
-    //strcpy(buffer, "luppi\ndylan\nvero\ntalpa\n");
-    fpptr = fopen("pollo.txt", "a");
+    //sprintf(stringa, "%d", port);
+    strcpy(stringa, "diego");
         
     while(fscanf(fptr, "%s", buffer)==1){
-        if(!strcmp(buffer, stringa) || !strcmp(buffer, "diego") || !strcmp(buffer, "18-10-2022|19:1:17")){
-            continue;
-        }
-        fprintf(fpptr, "%s\n", buffer);
+        if(!strcmp(buffer, stringa)){
+            fprintf(fpptr, "%s\n", stringa);
+            fscanf(fptr, "%s", buffer);
+            fprintf(fpptr, "%d\n", port);
+            fscanf(fptr, "%s", buffer);
+            fprintf(fpptr, "%s\n", timestamp);
+            fscanf(fptr, "%s", buffer);
+            fprintf(fpptr, "%d\n", 0);
+            } else{
+                fprintf(fpptr, "%s\n", buffer);
+            }
     }
     
     fclose(fptr);
     fclose(fpptr);
 
-    rename("pollo.txt", "mucca.txt");
 }

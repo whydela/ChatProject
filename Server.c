@@ -299,10 +299,10 @@ void dev_online(int sd){
     int port;
     time_t rawtime;
     struct tm * timeinfo;
-    FILE* fptr;
+    FILE* fptr, *fpptr, *fppptr;
 
     //tabella[riga][colonna] = username;
-    colonna++;
+    //colonna++;
     // Ricevo username
     send_dv(sd, RFD);
     recv(sd, username, sizeof(username), 0);
@@ -316,7 +316,6 @@ void dev_online(int sd){
     // Creo il timestamp
 
     fptr = fopen("srv/usr_online.txt", "a+");
-    
     //online = check_word(fptr, username);
 
     send_dv(sd, RFD);
@@ -325,14 +324,43 @@ void dev_online(int sd){
     
     recv(sd, &port, sizeof(port), 0);
 
-    
+    // Se l'username non e' presente nel file si scrivono tutti i valori del caso
     if(!check_word(fptr, username)){  
         fprintf(fptr, "%s\n", username);
         fprintf(fptr, "%d\n", port);
         fprintf(fptr, "%s\n", timestamp);
         // Indica che l'utente non ha ancora effettuato il log out
         fprintf(fptr, "%d\n", 0);
+
+    } 
+    // Altrimenti si sovrascrive il timestamp di login mettendo quello corrente, 
+    // e quello di log out mettendo 0
+    else{
+        fppptr = fopen("srv/usr_online.txt", "r");
+        fpptr = fopen("srv/usr_online1.txt", "a+");
+        fflush(fpptr);
+        fflush(fppptr);
+        while(fscanf(fppptr, "%s", buffer)==1){
+            printf("%s\n", buffer);
+            if(!strcmp(buffer, username)){
+                fprintf(fpptr, "%s\n", username);
+                fscanf(fppptr, "%s", buffer);
+                fprintf(fpptr, "%d\n", port);
+                fscanf(fppptr, "%s", buffer);
+                fprintf(fpptr, "%s\n", timestamp);
+                fscanf(fppptr, "%s", buffer);
+                fprintf(fpptr, "%d\n", 0);
+                } 
+                else{
+                    fprintf(fpptr, "%s\n", buffer);
+                }
+        }
+        fclose(fpptr);
+        fclose(fppptr);
+        remove("srv/usr_online.txt");
+        rename("srv/usr_online1.txt", "srv/usr_online.txt");
     }
+    
 
     chmod("srv/usr_online.txt", S_IRWXU);
 
@@ -343,6 +371,7 @@ void dev_online(int sd){
     printf("Ricevuto %s\n", timestamp);
 
 
+    memset(buffer, 0, sizeof(buffer));
     sprintf(buffer, "%s\n%s\n%d", username, timestamp, port);
 
     // Creo/apro un file contenente tutti gli username registrati
@@ -417,6 +446,12 @@ void dev_out(int sd){
     char buffer[1024];
     char usr_port[1024];
     int port;
+    int i = 0;    
+    time_t rawtime;
+    struct tm * timeinfo;
+
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
 
     send_dv(sd, RFD);
     recv(sd, username, sizeof(username), 0);
@@ -428,7 +463,6 @@ void dev_out(int sd){
     recv(sd, timestamp, sizeof(timestamp), 0);
 
     printf("%s sta andando OFFLINE !\n", username);
-    printf("%d, %s\n", port, timestamp);
 
     // Modifico i file
     fptr = fopen("srv/usr_log1.txt", "a");
@@ -453,6 +487,43 @@ void dev_out(int sd){
     fclose(fpptr);
 
     // log sistemato
+
+    fptr = fopen("srv/usr_online1.txt", "a");
+    fpptr = fopen("srv/usr_online.txt", "r");
+    fflush(fptr);
+    fflush(fpptr);
+
+    memset(timestamp, 0, sizeof(timestamp));
+
+    sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
+    timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+
+    // Questo passaggio permette di aggiornare il timestamp di logout degli utenti
+
+    while(fscanf(fpptr, "%s", buffer)==1){
+        if(!strcmp(buffer, username)){
+            while(i < 4){
+                if(i==3){
+                    fprintf(fptr, "%s\n", timestamp);
+                    break;
+                } else{
+                    fprintf(fptr, "%s\n", buffer);
+                }
+                fscanf(fpptr, "%s", buffer);
+                i++;
+            }
+        }
+        else{
+            fprintf(fptr, "%s\n", buffer);
+        }
+    }
+
+    remove("srv/usr_online.txt");
+    rename("srv/usr_online1.txt", "srv/usr_online.txt");
+
+    fclose(fptr);
+    fclose(fpptr);
+
 
 }
 

@@ -276,13 +276,8 @@ void online_config(int sd, int port){
         timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
         break;
     }
-    //recv(sd, buffer, sizeof(buffer), 0);
-    // Invio la porta dell'username 
-    //if(!strcmp(buffer, NO)){
-        send(sd, &port, sizeof(port), 0);
-    //}
 
-    //sprintf(buffer, "%s*%s*%d", username, timestamp, port);
+    send(sd, &port, sizeof(port), 0);
 
 }
 
@@ -329,7 +324,7 @@ void chat_config(int sd){
 
 }
 
-void config_offline(int sd){
+void out_config(int sd){
 
     char buffer[1024];
 
@@ -476,7 +471,6 @@ int main(int argc, char* argv[]){
     // Creiamo la cartella dell'username
     mkdir(username, 0700);
 
-
     while(1){
 
         strcpy(percorso, username);
@@ -512,8 +506,7 @@ int main(int argc, char* argv[]){
 
                     else if(!strcmp(buffer, "out")){
                         // Gestione comando out
-                        // Per ora esco
-                        config_offline(srv_sd);
+                        out_config(srv_sd);
                         exit(0);
                     }
 
