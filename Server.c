@@ -403,7 +403,7 @@ void crea_rubrica(int sd){
     FILE* fptr, *fpptr;
 
     fptr = fopen("srv/usr_all.txt", "r");
-    fpptr = fopen("srv/usr_online.txt", "r");
+    fpptr = fopen("srv/usr_log.txt", "r");
     
     send_dv(sd, RFD);
 
@@ -434,12 +434,41 @@ void dev_chat(int sd){
     // Preparo la rubrica
     crea_rubrica(sd);
     
-    char buffer[1024];
+    //char buffer[1024];
+    char scorre[1024];
     char dev_usr[1024];
+    char dev_port[1024];
     FILE* fptr;
 
 
-    fptr = fopen( , );
+    while(1){
+
+        recv(sd, dev_usr, sizeof(dev_usr), 0);
+
+        fptr = fopen("srv/usr_online.txt", "r");
+        fflush(fptr);
+
+        if(!check_word(fptr, dev_usr)){
+            send_dv(sd, NO);
+            continue;
+        }
+
+        fptr = fopen("srv/usr_online.txt", "r");
+        fflush(fptr);
+
+        while(fscanf(fptr, "%s", scorre)==1){
+            if(!strcmp(scorre, dev_usr)){
+                fscanf(fptr, "%s", dev_port);
+                break;
+            }
+        }
+        
+        send_dv(sd, dev_port);
+        
+        break;
+
+    }
+
 
 }
 
@@ -590,7 +619,7 @@ int main(int argc, char *argv[]) {
     fd_set read_fds;                                // Set di lettura gestito dalla select 
     int fdmax;                                      // Numero max di descrittori
     struct sockaddr_in my_addr;                     // Indirizzo Server
-    struct sockaddr_in cl_addr;                     // Indirizzo Client 
+    struct sockaddr_in cl_addr;                     // Indirizzo Device 
     int listener;                                   // Socket di ascolto
     int newfd;                                      // Socket di comunicazione
     char command[1024];

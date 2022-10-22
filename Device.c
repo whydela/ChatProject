@@ -103,6 +103,22 @@ int srv_config(struct sockaddr_in* srv_addr, int port){
 
 }
 
+int dev_connect(struct sockaddr_in* dev_addr, int port){
+
+    int sd;
+
+    sd = socket(AF_INET, SOCK_STREAM, 0);
+
+    memset(dev_addr, 0, sizeof(*dev_addr));     // Pulizia 
+    (*dev_addr).sin_family = AF_INET;           // Address family
+    (*dev_addr).sin_port = htons(port);
+
+    inet_pton(AF_INET, "127.0.0.1", &(*dev_addr).sin_addr);
+
+    return sd;
+
+}
+
 void send_srv(int sd, char* cmd){
 
     // In questo momento sono connesso al server 
@@ -292,9 +308,13 @@ void second_print(){
 
 void chat_config(int sd){
 
-    FILE* fptr;
+    //FILE* fptr;
     char buffer[1024];
     char dev_usr[1024];
+    struct sockaddr_in dev_addr;
+    int dev_port;
+    int dev_sd;
+    int ret;
 
     // Mandiamo il comando
     send_srv(sd, CMD_CHAT);
@@ -314,29 +334,42 @@ void chat_config(int sd){
     printf("Rubrica degli utenti registrati nel sistema:\n\n");
     printf("%s\n", rubrica);
 
-
-    strcat(percorso, "/");
+    /*
+    strcat(percorso, "/");  
     strcat(percorso, "rubrica.txt");
     fptr = fopen(percorso, "w+");
     fflush(fptr);
     fprintf(fptr, "%s", rubrica);
     fclose(fptr);
+    */
 
     while(1){
-
+        printf("Si prega di inserire l'username con cui si vuole aprire una chat\n");
         scanf("%s", dev_usr);
-        fptr = fopen(percorso, "r");
-        fflush(fptr);
-        if(!check_word(fptr, dev_usr)){
+        if(!strcmp(dev_usr, username)){
+            printf("ATTENZIONE ! Si prega di non inserire il proprio username.\n");
+            continue;
+        }
+        send_srv(sd, dev_usr);
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(!strcmp(buffer, NO)){
             printf("\nATTENZIONE ! Username non presente.\n");
             continue;
         }
-        fclose(fptr);
+        dev_port = atoi(buffer);
+        printf("La porta di %s e' %d\n", dev_usr, dev_port);
         break;
-
     }
 
-    
+    dev_sd = dev_connect(&dev_addr, dev_port);
+
+    // Provo a connettermi al dispositivo
+    ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
+
+    if(ret < 0){
+        printf("Dispositivo offline\n");    
+    }
+    printf("Online\n");
 
 }
 
@@ -382,16 +415,17 @@ void out_config(int sd){
 
 int main(int argc, char* argv[]){
 
-    int ret, my_sd, srv_sd, srv_port;
-    struct sockaddr_in my_addr, srv_addr;
+    int ret, srv_sd, srv_port;
+    struct sockaddr_in my_addr, srv_addr, dev_addr;
     char spacenter[1024];
     fd_set master;                                  // Set principale gestito dal programmatore con le macro 
     fd_set read_fds;                                // Set di lettura gestito dalla select 
     int fdmax;                                      // Numero max di descrittori
-    //int listener;                                   // Socket di ascolto
-    //int newfd;                                      // Socket di comunicazione
+    int listener;                                   // Socket di ascolto
+    int newfd;                                      // Socket di comunicazione
     char buffer[1024];
     int i;
+    int addrlen;
     
 
     if(argc < 2){
@@ -403,9 +437,9 @@ int main(int argc, char* argv[]){
     my_port = atoi(argv[1]);
 
     // Si connette il device alla porta desiderata 
-    my_sd = ip_config(&my_addr, my_port);
-    if(my_sd > 10){}
+    listener = ip_config(&my_addr, my_port);
 
+    listen(listener, 10);
 
     printf("\nConnessione al server in corso...\n");
 
@@ -432,9 +466,10 @@ int main(int argc, char* argv[]){
     //FD_SET(listener, &master);
     // Aggiungo il descrittore della STDIN al set master
     FD_SET(STDIN, &master);
+    FD_SET(listener, &master);
 
     // Il socket maggiore
-    fdmax = STDIN;
+    fdmax = listener;
 
     // Prima stampa
     first_print();
@@ -531,6 +566,21 @@ int main(int argc, char* argv[]){
                         second_print();
                     }
 
+                }
+
+                else if(i == listener) {                    // Se quello pronto e' il listener
+                    
+                    printf("Sono qui !\n");
+                    addrlen = sizeof(dev_addr);
+
+                    newfd = accept(listener, (struct sockaddr *)&dev_addr, (socklen_t*)&addrlen);
+
+                    printf("Ho accettato la connessione sul listener, aggiungo nuovo socket al SET\n");
+
+                    FD_SET(newfd, &master);                     // Aggiungo il nuovo socket al master
+                    fdmax = (newfd > fdmax) ? newfd : fdmax;    // Aggiorno fdmax
+
+                   
                 }
             } 
         }
