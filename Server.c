@@ -23,8 +23,6 @@
 
 char buffer[1024];
 
-int riga=0;
-int colonna=0;
 
 void first_print(){
     int i;
@@ -302,8 +300,6 @@ void dev_online(int sd){
     struct tm * timeinfo;
     FILE* fptr, *fpptr, *fppptr;
 
-    //tabella[riga][colonna] = username;
-    //colonna++;
     // Ricevo username
     send_dv(sd, RFD);
     recv(sd, username, sizeof(username), 0);
@@ -316,7 +312,7 @@ void dev_online(int sd){
 
     // Creo il timestamp
 
-    fptr = fopen("srv/usr_online.txt", "a+");
+    fptr = fopen("srv/usr_log.txt", "a+");
     //online = check_word(fptr, username);
 
     send_dv(sd, RFD);
@@ -337,8 +333,8 @@ void dev_online(int sd){
     // Altrimenti si sovrascrive il timestamp di login mettendo quello corrente, 
     // e quello di log out mettendo 0
     else{
-        fppptr = fopen("srv/usr_online.txt", "r");
-        fpptr = fopen("srv/usr_online1.txt", "a+");
+        fppptr = fopen("srv/usr_log.txt", "r");
+        fpptr = fopen("srv/usr_log1.txt", "a+");
         fflush(fpptr);
         fflush(fppptr);
         while(fscanf(fppptr, "%s", buffer)==1){
@@ -358,11 +354,11 @@ void dev_online(int sd){
         }
         fclose(fpptr);
         fclose(fppptr);
-        remove("srv/usr_online.txt");
-        rename("srv/usr_online1.txt", "srv/usr_online.txt");
+        remove("srv/usr_log.txt");
+        rename("srv/usr_log1.txt", "srv/usr_log.txt");
     }
 
-    chmod("srv/usr_online.txt", S_IRWXU);
+    chmod("srv/usr_log.txt", S_IRWXU);
 
     if(fptr){
         fclose(fptr);
@@ -377,62 +373,68 @@ void dev_online(int sd){
     // Creo/apro un file contenente tutti gli username registrati
     // Lo apro in scrittura perche' nel caso in cui ci sia un tentativo di login come primo comando in assoluto,
     // aprire il file in sola lettura non implica la sua creazione, ciò provocherebbe una crisi di consistenza
-    fptr = fopen("srv/usr_log.txt", "a+");
+    fptr = fopen("srv/usr_online.txt", "a+");
     fflush(fptr);
     if(!check_word(fptr, username)){
         fprintf(fptr, "%s\n", buffer);
     }
 
-    chmod("srv/usr_log.txt", S_IRWXU);
+    chmod("srv/usr_online.txt", S_IRWXU);
 
     if(fptr){
         fclose(fptr);
     }
 
-    riga++;
 
 }
 
-void crea_rubrica(int sd){
+void crea_lista(int sd){
     
     //char buffer[1024];
     char username[1024];
     char scorre[1024];
-    char rubrica[1024];
+    char lista[1024];
 
     FILE* fptr, *fpptr;
 
     fptr = fopen("srv/usr_all.txt", "r");
-    fpptr = fopen("srv/usr_log.txt", "r");
+    fpptr = fopen("srv/usr_online.txt", "r");
     
+    // Ready for data
     send_dv(sd, RFD);
 
+    // Si riceve l'username che vuole iniziare la chat
     recv(sd, username, sizeof(username), 0);
 
-    memset(rubrica, 0, sizeof(rubrica));
+    memset(lista, 0, sizeof(lista));        // Pulizia
 
     while(fscanf(fptr, "%s", scorre)==1){
+        // Se si trova lo stesso username si ignora
         if(!strcmp(scorre, username)){
             continue;
         }
         printf("%s\n", scorre);
+        // Se e' online
         if(check_word(fpptr, scorre)){
            strcat(scorre, ", ONLINE.");
         }
+        // Se e' offline
         else{
             strcat(scorre, ", OFFLINE.");
         }
         strcat(scorre, "\n");
-        strcat(rubrica, scorre);
+        strcat(lista, scorre);
     }
 
-    send_dv(sd, rubrica);
+    // Inviamo al device la lista
+    send_dv(sd, lista);
+
 }
 
 void dev_chat(int sd){
 
-    // Preparo la rubrica
-    crea_rubrica(sd);
+    // Preparo la lista degli utenti online e offline
+    crea_lista(sd);
     
     //char buffer[1024];
     char scorre[1024];
@@ -443,26 +445,31 @@ void dev_chat(int sd){
 
     while(1){
 
+        // Si riceve l'username richiesto per una chat
         recv(sd, dev_usr, sizeof(dev_usr), 0);
 
-        fptr = fopen("srv/usr_online.txt", "r");
+        fptr = fopen("srv/usr_log.txt", "r");
         fflush(fptr);
 
+        // Se non esiste si invia al device NO
         if(!check_word(fptr, dev_usr)){
             send_dv(sd, NO);
+            // E si ricevera' un ulteriore username da controllare
             continue;
         }
 
-        fptr = fopen("srv/usr_online.txt", "r");
+        fptr = fopen("srv/usr_log.txt", "r");
         fflush(fptr);
 
         while(fscanf(fptr, "%s", scorre)==1){
+        // Si estrae la porta dell'username richiesto per una chat
             if(!strcmp(scorre, dev_usr)){
                 fscanf(fptr, "%s", dev_port);
                 break;
             }
         }
-        
+
+        // Si invia la porta dell'username richiesto per una chat
         send_dv(sd, dev_port);
         
         break;
@@ -499,8 +506,8 @@ void dev_out(int sd){
     printf("%s sta andando OFFLINE !\n", username);
 
     // Modifico i file
-    fptr = fopen("srv/usr_log1.txt", "a");
-    fpptr = fopen("srv/usr_log.txt", "r");
+    fptr = fopen("srv/usr_online1.txt", "a");
+    fpptr = fopen("srv/usr_online.txt", "r");
     fflush(fptr);
     fflush(fpptr);
 
@@ -514,16 +521,16 @@ void dev_out(int sd){
         fprintf(fptr, "%s\n", buffer);
     }
 
-    remove("srv/usr_log.txt");
-    rename("srv/usr_log1.txt", "srv/usr_log.txt");
+    remove("srv/usr_online.txt");
+    rename("srv/usr_online1.txt", "srv/usr_online.txt");
 
     fclose(fptr);
     fclose(fpptr);
 
     // log sistemato
 
-    fptr = fopen("srv/usr_online1.txt", "a");
-    fpptr = fopen("srv/usr_online.txt", "r");
+    fptr = fopen("srv/usr_log1.txt", "a");
+    fpptr = fopen("srv/usr_log.txt", "r");
     fflush(fptr);
     fflush(fpptr);
 
@@ -552,8 +559,8 @@ void dev_out(int sd){
         }
     }
 
-    remove("srv/usr_online.txt");
-    rename("srv/usr_online1.txt", "srv/usr_online.txt");
+    remove("srv/usr_log.txt");
+    rename("srv/usr_log1.txt", "srv/usr_log.txt");
 
     fclose(fptr);
     fclose(fpptr);
@@ -566,7 +573,7 @@ void srv_list(){
     char buffer[1024];
     char stringa[1024];
 
-    FILE* fptr = fopen("srv/usr_log.txt", "r");
+    FILE* fptr = fopen("srv/usr_online.txt", "r");
 
     if(!fptr){
         printf("Nessun utente e' attualmente online\n");
@@ -624,11 +631,9 @@ int main(int argc, char *argv[]) {
     int newfd;                                      // Socket di comunicazione
     char command[1024];
     char buffer[1024];
-    //char tabella[1024][1024];
     int i;
     int addrlen;
 
-    
     // Questa funzione si occupa della prima stampa a video
     first_print();
 

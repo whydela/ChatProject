@@ -10,6 +10,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 #define RFD "RFD\0"
 #define CMD_REG "/REG\0"
@@ -28,6 +29,8 @@ char percorso[1024];                    // percorso: username/file.txt
 char rubrica[1024];                     // rubrica
 
 int my_port;                            // porta del device
+int srv_sd;
+bool online = false;
 
 
 void first_print(){
@@ -75,6 +78,8 @@ int ip_config(struct sockaddr_in* addr, int port){
     (*addr).sin_port = htons(port);
     (*addr).sin_addr.s_addr = INADDR_ANY;
 
+    setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+
     // Aggancio dell'indirizzo
     ret = bind(sd, (struct sockaddr*)addr, sizeof(*addr));
 
@@ -97,6 +102,8 @@ int srv_config(struct sockaddr_in* srv_addr, int port){
     (*srv_addr).sin_family = AF_INET;          // Address family
     (*srv_addr).sin_port = htons(port);
 
+    setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+
     inet_pton(AF_INET, "127.0.0.1", &(*srv_addr).sin_addr);
 
     return sd;
@@ -113,6 +120,8 @@ int dev_connect(struct sockaddr_in* dev_addr, int port){
     (*dev_addr).sin_family = AF_INET;           // Address family
     (*dev_addr).sin_port = htons(port);
 
+    setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+
     inet_pton(AF_INET, "127.0.0.1", &(*dev_addr).sin_addr);
 
     return sd;
@@ -121,16 +130,9 @@ int dev_connect(struct sockaddr_in* dev_addr, int port){
 
 void send_srv(int sd, char* cmd){
 
-    // In questo momento sono connesso al server 
-    int ret;
-    printf("Invio %s\n", cmd);
-    ret = send(sd, cmd, strlen(cmd)+1, 0);
+    //printf("Invio %s\n", cmd);
+    send(sd, cmd, strlen(cmd)+1, 0);
 
-    if(ret < 0){
-        perror("Errore in fase di invio comando: ");
-        exit(1);
-    }
-    
     printf("Messaggio %s inviato\n", cmd);
     
 }
@@ -252,7 +254,6 @@ bool log_config(int sd){
             continue;
         } else{
             // Altrimenti registra l'username e il device lo comunica
-            printf("\nUsername online\n\n");
             break;
         }
     }
@@ -302,19 +303,19 @@ void second_print(){
     printf("- hanging: per vedere gli utenti che hanno inviato messaggi mentre era offline.\n");
     printf("- show 'username': per ricevere i messaggi pendenti inviati da 'username'.\n");
     printf("- chat 'username': per iniziare una chat con 'username'.\n");
-    printf("- out: per disconnettersi dal Server.\n\n");
-    printf("(Digitare help per i dettagli dei comandi)\n\n");
+    printf("- out: per disconnettersi dal Server.\n\n-> ");
 }
 
 void chat_config(int sd){
 
-    //FILE* fptr;
+    FILE* fptr;
     char buffer[1024];
     char dev_usr[1024];
     struct sockaddr_in dev_addr;
     int dev_port;
     int dev_sd;
     int ret;
+    bool dev_friend=true;
 
     // Mandiamo il comando
     send_srv(sd, CMD_CHAT);
@@ -334,17 +335,9 @@ void chat_config(int sd){
     printf("Rubrica degli utenti registrati nel sistema:\n\n");
     printf("%s\n", rubrica);
 
-    /*
-    strcat(percorso, "/");  
-    strcat(percorso, "rubrica.txt");
-    fptr = fopen(percorso, "w+");
-    fflush(fptr);
-    fprintf(fptr, "%s", rubrica);
-    fclose(fptr);
-    */
 
     while(1){
-        printf("Si prega di inserire l'username con cui si vuole aprire una chat\n");
+        printf("Si prega di inserire l'username con cui si vuole aprire una chat\n\n-> ");
         scanf("%s", dev_usr);
         if(!strcmp(dev_usr, username)){
             printf("ATTENZIONE ! Si prega di non inserire il proprio username.\n");
@@ -363,13 +356,32 @@ void chat_config(int sd){
 
     dev_sd = dev_connect(&dev_addr, dev_port);
 
+    // Creo username/rubrica.txt
+    strcat(percorso, "/");  
+    strcat(percorso, "rubrica.txt");
+
+    // Creo/apro in lettura la rubrica
+    fptr = fopen(percorso, "a+");
+    fflush(fptr);
+    if(!check_word(fptr, dev_usr)){
+        // Cio' indica che e' la prima volta in cui il device chiede all'altro di comunicare
+        dev_friend = false;
+        fprintf(fptr, "%s\n", dev_usr);
+    }
+    fclose(fptr);
+
     // Provo a connettermi al dispositivo
     ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
 
     if(ret < 0){
+        // Dispositivo offline
         printf("Dispositivo offline\n");    
     }
-    printf("Online\n");
+    else{
+        // Dispositivo online
+        printf("Dispositivo online\n");
+    }
+
 
 }
 
@@ -413,9 +425,17 @@ void out_config(int sd){
     rmdir(username);
 }
 
+void handler(int sig){
+    //printf("Entro nell'handler\n");
+    if(online){
+        out_config(srv_sd);
+        exit(0);
+    }
+}
+
 int main(int argc, char* argv[]){
 
-    int ret, srv_sd, srv_port;
+    int ret, srv_port;
     struct sockaddr_in my_addr, srv_addr, dev_addr;
     char spacenter[1024];
     fd_set master;                                  // Set principale gestito dal programmatore con le macro 
@@ -426,7 +446,6 @@ int main(int argc, char* argv[]){
     char buffer[1024];
     int i;
     int addrlen;
-    
 
     if(argc < 2){
         printf("ATTENZIONE! Inserisca una porta.\n");
@@ -509,26 +528,31 @@ int main(int argc, char* argv[]){
         }
     }
 
-    printf("\nDevice ONLINE !\n");
 
     // Adesso il Device e' online, dobbiamo inviare al Server il timestamp corrente
     online_config(srv_sd, my_port);
-    
-    printf("Salve %s ! Benvenuto nel sistema di chatting.\n", username);
 
-    // Il Device si e' loggato, bisogna creare il menu' di comparsa
-    second_print();
+    online = true;
+
+    // Handler per la gestione della disconnessione del device improvvisa
+    signal(SIGINT, handler);    // CTRL+C
+    signal(SIGSTOP, handler);   // CTRL+Z o chiusura terminale
+
+    printf("Salve %s ! Benvenuto nel sistema di chatting.\n", username);
 
     // Creiamo la cartella dell'username
     mkdir(username, 0700);
+
 
     while(1){
 
         strcpy(percorso, username);
         //strcat(percorso, "/");
         read_fds = master;
+        // Il Device si e' loggato, bisogna creare il menu' di comparsa
+        second_print();
+        fflush(stdout);
 
-        printf("Parte il ciclo e chiamo la select\n");
         select(fdmax + 1, &read_fds, NULL, NULL, NULL);
 
         for(i=0; i<=fdmax; i++) {
@@ -569,8 +593,7 @@ int main(int argc, char* argv[]){
                 }
 
                 else if(i == listener) {                    // Se quello pronto e' il listener
-                    
-                    printf("Sono qui !\n");
+  
                     addrlen = sizeof(dev_addr);
 
                     newfd = accept(listener, (struct sockaddr *)&dev_addr, (socklen_t*)&addrlen);
@@ -584,6 +607,7 @@ int main(int argc, char* argv[]){
                 }
             } 
         }
+
      }
 
     sleep(60);
