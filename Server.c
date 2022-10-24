@@ -20,6 +20,7 @@
 #define CMD_OFF "/OFF"
 #define YES "/YES\0"
 #define NO "/NO\0"
+#define OFFLINE "/OFFLINE\0"
 
 char buffer[1024];
 
@@ -46,6 +47,7 @@ void first_print(){
 
 }
 
+
 int ip_config(struct sockaddr_in* addr, int port){
 
     int sd;
@@ -71,6 +73,19 @@ int ip_config(struct sockaddr_in* addr, int port){
 
     return sd;
 
+}
+
+int dev_config(struct sockaddr_in* dev_addr, int dev_port){
+
+    int sd;
+    
+    sd = socket(AF_INET, SOCK_STREAM, 0);   // Creazione socket
+    memset(dev_addr, 0, sizeof(*dev_addr));         // Pulizia
+
+    (*dev_addr).sin_family = AF_INET;          // Address family
+    (*dev_addr).sin_port = htons(dev_port);
+
+    return sd;
 }
 
 bool check_word(FILE* ptr, char stringa[1024]){
@@ -103,6 +118,56 @@ char* filetobuffer(FILE* fptr, char stringa[1024]){
     }
 
     return buffer;
+
+}
+
+void change_log(char username[1024]){
+    
+    FILE* fptr, *fpptr;
+    char buffer[1024];
+    char timestamp[1024];
+    int i = 0;
+    time_t rawtime;
+    struct tm * timeinfo;
+
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+
+    fptr = fopen("srv/usr_log1.txt", "a");
+    fpptr = fopen("srv/usr_log.txt", "r");
+    fflush(fptr);
+    fflush(fpptr);
+
+    memset(timestamp, 0, sizeof(timestamp));
+
+    sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
+    timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+
+    // Questo passaggio permette di aggiornare il timestamp di logout degli utenti
+
+    while(fscanf(fpptr, "%s", buffer)==1){
+        if(!strcmp(buffer, username)){
+            while(i < 4){
+                if(i==3){
+                    fprintf(fptr, "%s\n", timestamp);
+                    break;
+                } else{
+                    fprintf(fptr, "%s\n", buffer);
+                }
+                fscanf(fpptr, "%s", buffer);
+                i++;
+            }
+        }
+        else{
+            fprintf(fptr, "%s\n", buffer);
+        }
+    }
+
+    remove("srv/usr_log.txt");
+    rename("srv/usr_log1.txt", "srv/usr_log.txt");
+
+    fclose(fptr);
+    fclose(fpptr);
 
 }
 
@@ -388,10 +453,9 @@ void dev_online(int sd){
 
 }
 
-void crea_lista(int sd){
+void crea_lista(int sd, char username[1024]){
     
     //char buffer[1024];
-    char username[1024];
     char scorre[1024];
     char lista[1024];
 
@@ -431,16 +495,66 @@ void crea_lista(int sd){
 
 }
 
+void first_chat(int sd, char username[1024]){
+
+    FILE* fptr;
+    struct sockaddr_in dev_addr;
+    int dev_sd, dev_port, ret;
+    char scorre[1024];
+    int i = 0;  // Tentativi di connessione
+    int j = 0;  // Intervallo di tempo tra i tentativi
+
+    // Estraiamo la porta        
+    fptr = fopen("srv/usr_log.txt", "r");
+    fflush(fptr);
+    while(fscanf(fptr, "%s", scorre)==1){
+    // Si estrae la porta dell'username richiesto per una chat
+        if(!strcmp(scorre, username)){
+            fscanf(fptr, "%d", &dev_port);
+            break;
+        }
+    }
+
+    // Il Server prova a connettersi al device
+    dev_sd = dev_config(&dev_addr, dev_port);
+
+    // Connettiamo il Device al Server
+    while(1){
+        j=1000000000;
+        printf("TENTATIVO %d\n\n", i+1);
+        ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
+        if(ret < 0){
+            if((++i)==3){
+                // Si cambia il registro, cioè si setta il timestamp di logout di username a quello corrente
+                // come richiesto dalle specifiche
+                change_log(username);
+                send_dv(sd, OFFLINE);
+                return;
+            }
+        }
+
+        // Primo tentativo
+        while(1){
+            if(!(j--)){
+                break;
+            }
+        }
+    }
+
+}
+
 void dev_chat(int sd){
 
     // Preparo la lista degli utenti online e offline
-    crea_lista(sd);
+    char username[1024];
+    crea_lista(sd, username);
     
     //char buffer[1024];
     char scorre[1024];
     char dev_usr[1024];
     char dev_port[1024];
-    FILE* fptr;
+    FILE* fptr, * fpptr;
+    
 
 
     while(1){
@@ -456,6 +570,27 @@ void dev_chat(int sd){
             send_dv(sd, NO);
             // E si ricevera' un ulteriore username da controllare
             continue;
+        }
+
+        fclose(fptr);
+        
+        send_dv(sd, YES);
+
+        recv(sd, buffer, sizeof(buffer), 0);
+
+        if(!strcmp(buffer, YES)){
+            first_chat(sd, dev_usr);
+            // Adesso il server deve inoltrare il messaggio al mittente
+            recv(sd, buffer, sizeof(buffer), 0);
+            // Si invia il messaggio nella directory del destinatario
+            strcat(dev_usr, "/pendent/");
+            strcat(dev_usr, username);
+            strcat(dev_usr, ".txt");
+            printf("Il percorso e' %s\n", dev_usr);
+            fpptr = fopen(dev_usr, "a");
+            fflush(fpptr);
+            fprintf(fpptr, "%s\n", buffer);
+            return;
         }
 
         fptr = fopen("srv/usr_log.txt", "r");
@@ -476,6 +611,7 @@ void dev_chat(int sd){
 
     }
 
+    
 
 }
 
@@ -486,13 +622,12 @@ void dev_out(int sd){
     char timestamp[1024];
     char buffer[1024];
     char usr_port[1024];
-    int port;
-    int i = 0;    
-    time_t rawtime;
+    int port;  
+    /*time_t rawtime;
     struct tm * timeinfo;
 
     time(&rawtime);
-    timeinfo = localtime(&rawtime);
+    timeinfo = localtime(&rawtime);*/
 
     send_dv(sd, RFD);
     recv(sd, username, sizeof(username), 0);
@@ -505,7 +640,7 @@ void dev_out(int sd){
 
     printf("%s sta andando OFFLINE !\n", username);
 
-    // Modifico i file
+    // Tolgo dalla lista degli utenti online l'utente selezionato
     fptr = fopen("srv/usr_online1.txt", "a");
     fpptr = fopen("srv/usr_online.txt", "r");
     fflush(fptr);
@@ -527,43 +662,10 @@ void dev_out(int sd){
     fclose(fptr);
     fclose(fpptr);
 
-    // log sistemato
+    // Log sistemato
 
-    fptr = fopen("srv/usr_log1.txt", "a");
-    fpptr = fopen("srv/usr_log.txt", "r");
-    fflush(fptr);
-    fflush(fpptr);
-
-    memset(timestamp, 0, sizeof(timestamp));
-
-    sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
-    timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-
-    // Questo passaggio permette di aggiornare il timestamp di logout degli utenti
-
-    while(fscanf(fpptr, "%s", buffer)==1){
-        if(!strcmp(buffer, username)){
-            while(i < 4){
-                if(i==3){
-                    fprintf(fptr, "%s\n", timestamp);
-                    break;
-                } else{
-                    fprintf(fptr, "%s\n", buffer);
-                }
-                fscanf(fpptr, "%s", buffer);
-                i++;
-            }
-        }
-        else{
-            fprintf(fptr, "%s\n", buffer);
-        }
-    }
-
-    remove("srv/usr_log.txt");
-    rename("srv/usr_log1.txt", "srv/usr_log.txt");
-
-    fclose(fptr);
-    fclose(fpptr);
+    // Metto il timestamp di log out uguale a quello corrente
+    change_log(username);
 
 
 }

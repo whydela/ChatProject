@@ -20,6 +20,7 @@
 #define CMD_OFF "/OFF"
 #define YES "/YES\0"
 #define NO "/NO\0"
+#define OFFLINE "/OFFLINE\0"
 #define STDIN 0
 
 char username[1024];                    // username del device
@@ -27,6 +28,7 @@ char password[1024];                    // password del device
 char timestamp[1024];                   // username*timestamp*porta del device
 char percorso[1024];                    // percorso: username/file.txt
 char rubrica[1024];                     // rubrica
+char pendent[1024];
 
 int my_port;                            // porta del device
 int srv_sd;
@@ -311,12 +313,13 @@ void chat_config(int sd){
     FILE* fptr;
     char buffer[1024];
     char dev_usr[1024];
+    char messaggio[1024];
     struct sockaddr_in dev_addr;
     int dev_port;
     int dev_sd;
     int ret;
-    bool dev_friend=true;
-
+    bool dev_friend = true;
+    bool dev_online = true;
     // Mandiamo il comando
     send_srv(sd, CMD_CHAT);
 
@@ -329,32 +332,15 @@ void chat_config(int sd){
         break;
     }
 
-    // Ricevo la rubrica
+    // Ricevo la lista
     recv(sd, rubrica, sizeof(rubrica), 0);
 
-    printf("Rubrica degli utenti registrati nel sistema:\n\n");
+    printf("Lista degli utenti registrati nel sistema:\n\n");
     printf("%s\n", rubrica);
 
-
-    while(1){
-        printf("Si prega di inserire l'username con cui si vuole aprire una chat\n\n-> ");
-        scanf("%s", dev_usr);
-        if(!strcmp(dev_usr, username)){
-            printf("ATTENZIONE ! Si prega di non inserire il proprio username.\n");
-            continue;
-        }
-        send_srv(sd, dev_usr);
-        recv(sd, buffer, sizeof(buffer), 0);
-        if(!strcmp(buffer, NO)){
-            printf("\nATTENZIONE ! Username non presente.\n");
-            continue;
-        }
-        dev_port = atoi(buffer);
-        printf("La porta di %s e' %d\n", dev_usr, dev_port);
-        break;
-    }
-
-    dev_sd = dev_connect(&dev_addr, dev_port);
+    strcpy(messaggio, username);
+    strcat(messaggio, ": ");
+    //printf("%s\n", messaggio);
 
     // Creo username/rubrica.txt
     strcat(percorso, "/");  
@@ -366,22 +352,73 @@ void chat_config(int sd){
     if(!check_word(fptr, dev_usr)){
         // Cio' indica che e' la prima volta in cui il device chiede all'altro di comunicare
         dev_friend = false;
-        fprintf(fptr, "%s\n", dev_usr);
+        //fprintf(fptr, "%s\n", dev_usr); //! QUESTO VA MESSO PIU' SOTTO
     }
     fclose(fptr);
+
+    while(1){
+        printf("Si prega di inserire l'username con cui si vuole aprire una chat\n\n-> ");
+
+        scanf("%s", dev_usr);
+
+        if(!strcmp(dev_usr, username)){
+            printf("ATTENZIONE ! Si prega di non inserire il proprio username.\n");
+            continue;
+        }
+    
+        send_srv(sd, dev_usr);
+
+        recv(sd, buffer, sizeof(buffer), 0);
+        printf("Ricevo %s\n", buffer);
+
+        if(!strcmp(buffer, NO)){
+            printf("\nATTENZIONE ! Username non presente.\n");
+            continue;
+        }
+     
+        // Se e' la prima volta che gli manda un messaggio dice al server YES
+        if(!dev_friend){
+            send_srv(sd, YES);
+        } 
+        // Altrimenti gli invia NO 
+        else{
+            send_srv(sd, NO);
+        }
+
+        recv(sd, buffer, sizeof(buffer), 0);
+        printf("Ricevo %s\n", buffer);
+        if(!strcmp(buffer, OFFLINE)){
+            printf("Username offline, il messaggio scritto verra' comunque inviato:\n-> ");
+            scanf("%s", buffer);
+            strcat(messaggio, buffer);
+            strcat(messaggio, "*");
+            send_srv(sd, messaggio);
+            // Il NO indica che e' la prima volta che questo utente vuole parlare con lui
+            //send_srv(sd, NO);
+            return;
+        }
+
+        // A questo punto il Server ci ha inviati la porta del Device
+        dev_port = atoi(buffer);
+        printf("La porta di %s e' %d\n", dev_usr, dev_port);
+
+        break;
+    }
+
+    dev_sd = dev_connect(&dev_addr, dev_port);
 
     // Provo a connettermi al dispositivo
     ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
 
     if(ret < 0){
         // Dispositivo offline
-        printf("Dispositivo offline\n");    
+        printf("Dispositivo offline\n"); 
+        dev_online = false;
     }
-    else{
-        // Dispositivo online
-        printf("Dispositivo online\n");
-    }
+    
+    if(dev_friend|| dev_online){
 
+    }
 
 }
 
@@ -422,6 +459,7 @@ void out_config(int sd){
     strcat(percorso, "/rubrica.txt");
 
     remove(percorso);
+    rmdir(pendent);
     rmdir(username);
 }
 
@@ -542,6 +580,9 @@ int main(int argc, char* argv[]){
 
     // Creiamo la cartella dell'username
     mkdir(username, 0700);
+    strcpy(pendent, username);
+    strcat(pendent, "/pendent");
+    mkdir(pendent, 0700);
 
 
     while(1){
