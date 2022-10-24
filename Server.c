@@ -556,7 +556,6 @@ void dev_chat(int sd){
     FILE* fptr, * fpptr;
     
 
-
     while(1){
 
         // Si riceve l'username richiesto per una chat
@@ -590,6 +589,7 @@ void dev_chat(int sd){
             fpptr = fopen(dev_usr, "a");
             fflush(fpptr);
             fprintf(fpptr, "%s\n", buffer);
+            fflush(fpptr);
             return;
         }
 
