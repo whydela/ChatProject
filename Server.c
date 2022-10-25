@@ -47,7 +47,6 @@ void first_print(){
 
 }
 
-
 int ip_config(struct sockaddr_in* addr, int port){
 
     int sd;
@@ -495,11 +494,12 @@ void crea_lista(int sd, char username[1024]){
 
 }
 
-void first_chat(int sd, char username[1024]){
+bool first_chat(int sd, char username[1024]){
 
     FILE* fptr;
     struct sockaddr_in dev_addr;
-    int dev_sd, dev_port, ret;
+    int dev_sd, ret;
+    char dev_port[1024];
     char scorre[1024];
 
     // Estraiamo la porta        
@@ -509,13 +509,13 @@ void first_chat(int sd, char username[1024]){
     while(fscanf(fptr, "%s", scorre)==1){
     // Si estrae la porta dell'username richiesto per una chat
         if(!strcmp(scorre, username)){
-            fscanf(fptr, "%d", &dev_port);
+            fscanf(fptr, "%s", dev_port);
             break;
         }
     }
 
     // Il Server prova a connettersi al device
-    dev_sd = dev_config(&dev_addr, dev_port);
+    dev_sd = dev_config(&dev_addr, atoi(dev_port));
 
     // Connettiamo il Device al Server
     ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
@@ -523,8 +523,11 @@ void first_chat(int sd, char username[1024]){
     if(ret < 0){
         change_log(username);
         send_dv(sd, OFFLINE);
+        return false;
     }
-    
+
+    send_dv(sd, dev_port);
+    return true;
 
 }
 
@@ -535,11 +538,13 @@ void dev_chat(int sd){
     crea_lista(sd, username);
     
     //char buffer[1024];
-    char scorre[1024];
+    //char scorre[1024];
     char percorso[1024];
     char dev_usr[1024];
-    char dev_port[1024];
+    //char dev_port[1024];
+
     FILE* fptr, * fpptr;
+    // percorso -> srv/
     strcpy(percorso, "srv/");
     
 
@@ -561,22 +566,27 @@ void dev_chat(int sd){
         fclose(fptr);
         
         send_dv(sd, YES);
-
+        
         recv(sd, buffer, sizeof(buffer), 0);
 
         // Se si riceve YES dal device, vuol dire che e' la prima chat
         if(!strcmp(buffer, YES)){
 
-            first_chat(sd, dev_usr);
+            if(first_chat(sd, dev_usr)){
+                printf("ESCO\n");
+                return;
+            }
 
             // Adesso il server deve inoltrare il messaggio al mittente
             recv(sd, buffer, sizeof(buffer), 0);
             
             // Si invia il messaggio in una directory contenente i messaggi pendenti
+            // percorso -> srv/dev_usr
             strcat(percorso, dev_usr);
+            // Creiamo la cartella srv/dev_usr
             mkdir(percorso, 0700);
 
-            // Creiamo la cartella dei messaggi pendenti srv/username/pendent/dev_usr.txt
+            // Creiamo la cartella dei messaggi pendenti srv/dev_usr/pendent
             strcat(percorso, "/pendent");
             mkdir(percorso, 0700);
 
@@ -584,7 +594,8 @@ void dev_chat(int sd){
             strcat(percorso, username);
             strcat(percorso, ".txt");
 
-            printf("Il percorso e' %s\n", percorso);
+            // Creiamo il file srv/dev_usr/pendent/username.txt
+            //printf("Il percorso e' %s\n", percorso);
             fpptr = fopen(percorso, "a");
             fflush(fpptr);
             fprintf(fpptr, "%s\n", buffer);
@@ -592,20 +603,6 @@ void dev_chat(int sd){
             return;
 
         }
-
-        fptr = fopen("srv/usr_log.txt", "r");
-        fflush(fptr);
-
-        while(fscanf(fptr, "%s", scorre)==1){
-        // Si estrae la porta dell'username richiesto per una chat
-            if(!strcmp(scorre, dev_usr)){
-                fscanf(fptr, "%s", dev_port);
-                break;
-            }
-        }
-
-        // Si invia la porta dell'username richiesto per una chat
-        send_dv(sd, dev_port);
         
         break;
 
@@ -822,13 +819,14 @@ int main(int argc, char *argv[]) {
                 while(1){
                     ret = recv(i, command, sizeof(command), 0);   
 
-                    if(!ret){                               // Socket i e' stato chiuso, (Device Offline ?) 
+                    if(!ret){                               // Socket i e' stato chiuso, Device offline
                         printf("Socket chiuso\n");
                         FD_CLR(i, &master);                 // Lo tolgo dal master 
                         close(i);                           // Lo chiudo
                         printf("Chiudo il socket %d e lo tolgo dal set\n", i);
 
-                    } else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
+                    } 
+                    else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
 
                         //printf("Il comunicatore (socket %d) e' pronto\n", i);
                         printf("E' arrivato il comando %s\n", command);
@@ -867,7 +865,8 @@ int main(int argc, char *argv[]) {
                             printf("Gestione out\n");
                             dev_out(i);
                         }
-                    } else{
+                    } 
+                    else{
                         perror("Errore nella reiceve: ");
                     }
                     break;

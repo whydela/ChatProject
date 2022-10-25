@@ -22,6 +22,7 @@
 #define NO "/NO\0"
 #define OFFLINE "/OFFLINE\0"
 #define STDIN 0
+#define EXIT "\\q\0"
 
 char username[1024];                    // username del device
 char password[1024];                    // password del device
@@ -131,6 +132,15 @@ int dev_connect(struct sockaddr_in* dev_addr, int port){
 }
 
 void send_srv(int sd, char* cmd){
+
+    //printf("Invio %s\n", cmd);
+    send(sd, cmd, strlen(cmd)+1, 0);
+
+    printf("Messaggio %s inviato\n", cmd);
+    
+}
+
+void send_dev(int sd, char* cmd){
 
     //printf("Invio %s\n", cmd);
     send(sd, cmd, strlen(cmd)+1, 0);
@@ -308,7 +318,14 @@ void second_print(){
     printf("- out: per disconnettersi dal Server.\n\n-> ");
 }
 
-void send_msg(int sd, bool online){
+void chat(){
+
+    FILE* fptr;
+
+
+}
+
+bool send_msg(int sd, bool online){
 
     char messaggio[1024];
     char timestamp[1024];
@@ -333,6 +350,11 @@ void send_msg(int sd, bool online){
 
     scanf("%s", stringa);
 
+    if(!strcmp(stringa, EXIT)){
+        printf("Voglio uscire dalla chat\n");
+        return true;
+    }
+
     fgets(buffer, sizeof(buffer), stdin);
     buffer[strlen(buffer)-1]= '\0';
     strcat(stringa, buffer);
@@ -346,6 +368,8 @@ void send_msg(int sd, bool online){
 
     send_srv(sd, messaggio);
 
+    return false;
+
 }
 
 void chat_config(int sd){
@@ -353,15 +377,18 @@ void chat_config(int sd){
     FILE* fptr;
     char buffer[1024];
     char dev_usr[1024];
+    char lista[1024];
     struct sockaddr_in dev_addr;
     int dev_port;
     int dev_sd;
     int ret;
     bool dev_friend = true;
     bool dev_online = true;
+
     // Mandiamo il comando
     send_srv(sd, CMD_CHAT);
 
+    // Mandiamo anche l'username ma prima chiediamo se il Server è ReadyForData
     while(1){
         recv(sd, buffer, sizeof(buffer), 0);
         if(strcmp(buffer, RFD)){
@@ -372,10 +399,10 @@ void chat_config(int sd){
     }
 
     // Ricevo la lista
-    recv(sd, rubrica, sizeof(rubrica), 0);
+    recv(sd, lista, sizeof(lista), 0);
 
     printf("Lista degli utenti registrati nel sistema:\n\n");
-    printf("%s\n", rubrica);
+    printf("%s\n", lista);
 
     // Creo username/rubrica.txt
     strcat(percorso, "/");  
@@ -389,7 +416,7 @@ void chat_config(int sd){
         dev_friend = false;
         //fprintf(fptr, "%s\n", dev_usr); //! QUESTO VA MESSO PIU' SOTTO
     }
-    fclose(fptr);
+    
 
     while(1){
         printf("Si prega di inserire l'username con cui si vuole aprire una chat\n\n-> ");
@@ -431,9 +458,14 @@ void chat_config(int sd){
             return;
         }
 
+        if(!dev_friend){
+            fprintf(fptr, "%s\n", dev_usr);
+        }
+        fclose(fptr);
+
         // A questo punto il Server ci ha inviati la porta del Device
         dev_port = atoi(buffer);
-        printf("La porta di %s e' %d\n", dev_usr, dev_port);
+        //printf("La porta di %s e' %d\n", dev_usr, dev_port);
 
         break;
     }
@@ -448,10 +480,14 @@ void chat_config(int sd){
         printf("Dispositivo offline\n"); 
         dev_online = false;
     }
-    
-    if(dev_friend|| dev_online){
 
-    }
+    printf("\n\n Chat con %s iniziata !\n\n-> ", dev_usr);
+
+    send_dev(dev_sd, CMD_CHAT);
+
+    chat(dev_sd);
+    
+    
 
 }
 
@@ -504,6 +540,12 @@ void handler(int sig){
     }
 }
 
+void dev_chat(int sd){
+    
+    
+
+}
+
 int main(int argc, char* argv[]){
 
     int ret, srv_port;
@@ -515,6 +557,7 @@ int main(int argc, char* argv[]){
     int listener;                                   // Socket di ascolto
     int newfd;                                      // Socket di comunicazione
     char buffer[1024];
+    char command[1024];
     int i;
     int addrlen;
 
@@ -672,12 +715,44 @@ int main(int argc, char* argv[]){
 
                     newfd = accept(listener, (struct sockaddr *)&dev_addr, (socklen_t*)&addrlen);
 
-                    printf("Ho accettato la connessione sul listener, aggiungo nuovo socket al SET\n");
+                    printf("Hai un nuovo messaggio !\n");
+
+                    printf("\nDigita 'chat' \n");
 
                     FD_SET(newfd, &master);                     // Aggiungo il nuovo socket al master
                     fdmax = (newfd > fdmax) ? newfd : fdmax;    // Aggiorno fdmax
-
                    
+                }
+                else{                                     // Se il socket pronto e' il comunicatore
+
+                while(1){
+                    ret = recv(i, command, sizeof(command), 0);   
+
+                    if(!ret){                               // Socket i e' stato chiuso, Device offline
+                        printf("Socket chiuso\n");
+                        FD_CLR(i, &master);                 // Lo tolgo dal master 
+                        close(i);                           // Lo chiudo
+                        printf("Chiudo il socket %d e lo tolgo dal set\n", i);
+
+                    } 
+                    else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
+
+                        //printf("Il comunicatore (socket %d) e' pronto\n", i);
+                        printf("E' arrivato il comando %s\n", command);
+
+                        // Gestione registrazione
+                        if(!strcmp(command, CMD_CHAT)){
+
+                            printf("Gestione CHAT\n");
+                            dev_chat(i);
+
+                        }
+                    } 
+                    else{
+                        perror("Errore nella reiceve: ");
+                    }
+                    break;
+                } 
                 }
             } 
         }
