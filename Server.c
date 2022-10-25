@@ -148,7 +148,7 @@ void change_log(char username[1024]){
     while(fscanf(fpptr, "%s", buffer)==1){
         if(!strcmp(buffer, username)){
             while(i < 4){
-                if(i==3){
+                if(i==3 && !strcmp(buffer, "0")){
                     fprintf(fptr, "%s\n", timestamp);
                     break;
                 } else{
@@ -501,12 +501,11 @@ void first_chat(int sd, char username[1024]){
     struct sockaddr_in dev_addr;
     int dev_sd, dev_port, ret;
     char scorre[1024];
-    int i = 0;  // Tentativi di connessione
-    int j = 0;  // Intervallo di tempo tra i tentativi
 
     // Estraiamo la porta        
     fptr = fopen("srv/usr_log.txt", "r");
     fflush(fptr);
+
     while(fscanf(fptr, "%s", scorre)==1){
     // Si estrae la porta dell'username richiesto per una chat
         if(!strcmp(scorre, username)){
@@ -519,27 +518,13 @@ void first_chat(int sd, char username[1024]){
     dev_sd = dev_config(&dev_addr, dev_port);
 
     // Connettiamo il Device al Server
-    while(1){
-        j=1000000000;
-        printf("TENTATIVO %d\n\n", i+1);
-        ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
-        if(ret < 0){
-            if((++i)==3){
-                // Si cambia il registro, cioè si setta il timestamp di logout di username a quello corrente
-                // come richiesto dalle specifiche
-                change_log(username);
-                send_dv(sd, OFFLINE);
-                return;
-            }
-        }
+    ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
 
-        // Primo tentativo
-        while(1){
-            if(!(j--)){
-                break;
-            }
-        }
+    if(ret < 0){
+        change_log(username);
+        send_dv(sd, OFFLINE);
     }
+    
 
 }
 
@@ -551,9 +536,11 @@ void dev_chat(int sd){
     
     //char buffer[1024];
     char scorre[1024];
+    char percorso[1024];
     char dev_usr[1024];
     char dev_port[1024];
     FILE* fptr, * fpptr;
+    strcpy(percorso, "srv/");
     
 
     while(1){
@@ -577,20 +564,33 @@ void dev_chat(int sd){
 
         recv(sd, buffer, sizeof(buffer), 0);
 
+        // Se si riceve YES dal device, vuol dire che e' la prima chat
         if(!strcmp(buffer, YES)){
+
             first_chat(sd, dev_usr);
+
             // Adesso il server deve inoltrare il messaggio al mittente
             recv(sd, buffer, sizeof(buffer), 0);
-            // Si invia il messaggio nella directory del destinatario
-            strcat(dev_usr, "/pendent/");
-            strcat(dev_usr, username);
-            strcat(dev_usr, ".txt");
-            printf("Il percorso e' %s\n", dev_usr);
-            fpptr = fopen(dev_usr, "a");
+            
+            // Si invia il messaggio in una directory contenente i messaggi pendenti
+            strcat(percorso, dev_usr);
+            mkdir(percorso, 0700);
+
+            // Creiamo la cartella dei messaggi pendenti srv/username/pendent/dev_usr.txt
+            strcat(percorso, "/pendent");
+            mkdir(percorso, 0700);
+
+            strcat(percorso, "/");
+            strcat(percorso, username);
+            strcat(percorso, ".txt");
+
+            printf("Il percorso e' %s\n", percorso);
+            fpptr = fopen(percorso, "a");
             fflush(fpptr);
             fprintf(fpptr, "%s\n", buffer);
             fflush(fpptr);
             return;
+
         }
 
         fptr = fopen("srv/usr_log.txt", "r");
@@ -623,11 +623,6 @@ void dev_out(int sd){
     char buffer[1024];
     char usr_port[1024];
     int port;  
-    /*time_t rawtime;
-    struct tm * timeinfo;
-
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);*/
 
     send_dv(sd, RFD);
     recv(sd, username, sizeof(username), 0);
