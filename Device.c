@@ -308,12 +308,51 @@ void second_print(){
     printf("- out: per disconnettersi dal Server.\n\n-> ");
 }
 
+void send_msg(int sd, bool online){
+
+    char messaggio[1024];
+    char timestamp[1024];
+    char buffer[1024];
+    char stringa[1024];
+
+    time_t rawtime;
+    struct tm * timeinfo;
+
+    time(&rawtime);
+    // Converto l'ora
+    timeinfo = localtime(&rawtime);
+    sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
+    timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+
+    strcpy(messaggio, "[");
+    strcat(messaggio, timestamp);
+    strcat(messaggio, "]");
+    strcat(messaggio, "\t");
+    strcat(messaggio, username);
+    strcat(messaggio, ": ");
+
+    scanf("%s", stringa);
+
+    fgets(buffer, sizeof(buffer), stdin);
+    buffer[strlen(buffer)-1]= '\0';
+    strcat(stringa, buffer);
+    strcat(messaggio, stringa);
+    
+    if(online){
+        strcat(messaggio, " **");
+    } else{
+        strcat(messaggio, " *");
+    }
+
+    send_srv(sd, messaggio);
+
+}
+
 void chat_config(int sd){
 
     FILE* fptr;
     char buffer[1024];
     char dev_usr[1024];
-    char messaggio[1024];
     struct sockaddr_in dev_addr;
     int dev_port;
     int dev_sd;
@@ -337,10 +376,6 @@ void chat_config(int sd){
 
     printf("Lista degli utenti registrati nel sistema:\n\n");
     printf("%s\n", rubrica);
-
-    strcpy(messaggio, username);
-    strcat(messaggio, ": ");
-    //printf("%s\n", messaggio);
 
     // Creo username/rubrica.txt
     strcat(percorso, "/");  
@@ -369,13 +404,12 @@ void chat_config(int sd){
         send_srv(sd, dev_usr);
 
         recv(sd, buffer, sizeof(buffer), 0);
-        printf("Ricevo %s\n", buffer);
 
         if(!strcmp(buffer, NO)){
             printf("\nATTENZIONE ! Username non presente.\n");
             continue;
         }
-     
+    
         // Se e' la prima volta che gli manda un messaggio dice al server YES
         if(!dev_friend){
             send_srv(sd, YES);
@@ -386,15 +420,14 @@ void chat_config(int sd){
         }
 
         recv(sd, buffer, sizeof(buffer), 0);
-        printf("Ricevo %s\n", buffer);
+
         if(!strcmp(buffer, OFFLINE)){
-            printf("Username offline, il messaggio scritto verra' comunque inviato:\n-> ");
-            scanf("%s", buffer);
-            strcat(messaggio, buffer);
-            strcat(messaggio, "*");
-            send_srv(sd, messaggio);
+
+            printf("Username offline e non presente in rubrica, il messaggio verra' comunque inviato:\n\n-> ");
+
+            send_msg(sd, false);
             // Il NO indica che e' la prima volta che questo utente vuole parlare con lui
-            //send_srv(sd, NO);
+            // send_srv(sd, NO);
             return;
         }
 
