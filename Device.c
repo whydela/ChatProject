@@ -30,6 +30,7 @@ char timestamp[1024];                   // username*timestamp*porta del device
 char percorso[1024];                    // percorso: username/file.txt
 char rubrica[1024];                     // rubrica
 char pendent[1024];
+char messaggio[1024];                   // messaggio della chat
 
 int my_port;                            // porta del device
 int srv_sd;
@@ -117,7 +118,7 @@ int dev_connect(struct sockaddr_in* dev_addr, int port){
 
     int sd;
 
-    sd = socket(AF_INET, SOCK_STREAM, 0);
+    sd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 
     memset(dev_addr, 0, sizeof(*dev_addr));     // Pulizia 
     (*dev_addr).sin_family = AF_INET;           // Address family
@@ -140,13 +141,13 @@ void send_srv(int sd, char* cmd){
     
 }
 
-void send_dev(int sd, char* cmd){
-
-    //printf("Invio %s\n", cmd);
-    send(sd, cmd, strlen(cmd)+1, 0);
-
-    printf("Messaggio %s inviato\n", cmd);
+int send_dev(int sd, char* cmd){
     
+    int ret;
+    //printf("Invio %s\n", cmd);
+    ret = send(sd, cmd, strlen(cmd)+1, 0);
+
+    return ret;
 }
 
 void reg_config(int sd){
@@ -314,20 +315,13 @@ void second_print(){
     printf("\nSi prega di inserire un comando:\n\n");
     printf("- hanging: per vedere gli utenti che hanno inviato messaggi mentre era offline.\n");
     printf("- show 'username': per ricevere i messaggi pendenti inviati da 'username'.\n");
-    printf("- chat 'username': per iniziare una chat con 'username'.\n");
+    printf("- chat: per iniziare una chat.\n");
     printf("- out: per disconnettersi dal Server.\n\n-> ");
 }
 
-void chat(){
 
-    FILE* fptr;
+char* msg(bool online){
 
-
-}
-
-bool send_msg(int sd, bool online){
-
-    char messaggio[1024];
     char timestamp[1024];
     char buffer[1024];
     char stringa[1024];
@@ -341,6 +335,8 @@ bool send_msg(int sd, bool online){
     sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
     timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 
+    memset(messaggio, 0, sizeof(messaggio));
+
     strcpy(messaggio, "[");
     strcat(messaggio, timestamp);
     strcat(messaggio, "]");
@@ -351,8 +347,7 @@ bool send_msg(int sd, bool online){
     scanf("%s", stringa);
 
     if(!strcmp(stringa, EXIT)){
-        printf("Voglio uscire dalla chat\n");
-        return true;
+        return EXIT;
     }
 
     fgets(buffer, sizeof(buffer), stdin);
@@ -360,16 +355,88 @@ bool send_msg(int sd, bool online){
     strcat(stringa, buffer);
     strcat(messaggio, stringa);
     
-    if(online){
+    /*if(online){
         strcat(messaggio, " **");
     } else{
         strcat(messaggio, " *");
+    }*/
+
+    return messaggio;
+
+}
+
+void chat(int sd){
+
+    fd_set master_chat;
+    fd_set read_chat;
+    int fdmax;
+    int i;
+    bool online = true;
+
+    FD_ZERO(&read_chat);
+    FD_ZERO(&master_chat);
+    FD_SET(STDIN, &master_chat);
+    FD_SET(sd, &master_chat);
+
+    fdmax = sd;
+    //FILE* fptr;
+    char sent[1024];
+    char coming[1024];
+    int ret;
+    //char buffer[1024];
+    while(1){
+
+        read_chat = master_chat;
+        fflush(stdout);
+
+        select(fdmax + 1, &read_chat, NULL, NULL, NULL);
+
+        for(i=0; i<=fdmax; i++) {
+            // Cerco quelli pronti
+            if(FD_ISSET(i, &read_chat)) {
+
+                if(!i){
+                    memset(sent, 0, sizeof(sent));
+                    memset(coming, 0, sizeof(coming));
+
+                    // Elaboriamo il messaggio
+                    strcpy(sent, msg(online));
+
+                    ret = send_dev(sd, sent);
+
+                    if(ret > 0){
+                        printf("%s\n", sent);
+                    }
+
+                    if(!strcmp(sent, EXIT)){
+                        printf("VOGLIO USCIRE\n\n");
+                        return;
+                    }
+                }
+
+                else if(i == sd){
+
+                    ret = recv(sd, coming, sizeof(coming), 0);
+
+                    if (ret > 0){
+                        fflush(stdin);
+                        fflush(stdout);
+                        if(!strcmp(coming, EXIT)){
+                            printf("DEVICE USCITO\n");
+                            online = false;
+                        } else{
+                            printf("%s\n", coming);
+                        }
+                        fflush(stdout);
+                        fflush(stdin);
+
+                    }
+
+                }
+            }
+        
+        }
     }
-
-    send_srv(sd, messaggio);
-
-    return false;
-
 }
 
 void chat_config(int sd){
@@ -383,7 +450,7 @@ void chat_config(int sd){
     int dev_sd;
     int ret;
     bool dev_friend = true;
-    bool dev_online = true;
+    //bool dev_online = true;
 
     // Mandiamo il comando
     send_srv(sd, CMD_CHAT);
@@ -405,8 +472,9 @@ void chat_config(int sd){
     printf("%s\n", lista);
 
     // Creo username/rubrica.txt
+
     strcat(percorso, "/");  
-    strcat(percorso, "rubrica.txt");
+    strcat(percorso, "rubrica.txt");    
 
     // Creo/apro in lettura la rubrica
     fptr = fopen(percorso, "a+");
@@ -416,6 +484,7 @@ void chat_config(int sd){
         dev_friend = false;
         //fprintf(fptr, "%s\n", dev_usr); //! QUESTO VA MESSO PIU' SOTTO
     }
+    fclose(fptr);
     
 
     while(1){
@@ -427,7 +496,7 @@ void chat_config(int sd){
             printf("ATTENZIONE ! Si prega di non inserire il proprio username.\n");
             continue;
         }
-    
+
         send_srv(sd, dev_usr);
 
         recv(sd, buffer, sizeof(buffer), 0);
@@ -452,13 +521,14 @@ void chat_config(int sd){
 
             printf("Username offline e non presente in rubrica, il messaggio verra' comunque inviato:\n\n-> ");
 
-            send_msg(sd, false);
+            send_srv(sd, msg(false));
             // Il NO indica che e' la prima volta che questo utente vuole parlare con lui
             // send_srv(sd, NO);
             return;
         }
-
-        if(!dev_friend){
+        fptr = fopen(percorso, "a+");
+        fflush(fptr);
+        if(!check_word(fptr, dev_usr)){
             fprintf(fptr, "%s\n", dev_usr);
         }
         fclose(fptr);
@@ -478,10 +548,10 @@ void chat_config(int sd){
     if(ret < 0){
         // Dispositivo offline
         printf("Dispositivo offline\n"); 
-        dev_online = false;
+        // dev_online = false;
     }
 
-    printf("\n\n Chat con %s iniziata !\n\n-> ", dev_usr);
+    printf("\n\nChat con %s iniziata !\n\n", dev_usr);
 
     send_dev(dev_sd, CMD_CHAT);
 
@@ -527,9 +597,9 @@ void out_config(int sd){
 
     strcat(percorso, "/rubrica.txt");
 
-    remove(percorso);
-    rmdir(pendent);
-    rmdir(username);
+    //remove(percorso);
+    //rmdir(pendent);
+    //rmdir(username);
 }
 
 void handler(int sig){
@@ -542,7 +612,7 @@ void handler(int sig){
 
 void dev_chat(int sd){
     
-    
+    chat(sd);
 
 }
 
@@ -715,9 +785,9 @@ int main(int argc, char* argv[]){
 
                     newfd = accept(listener, (struct sockaddr *)&dev_addr, (socklen_t*)&addrlen);
 
-                    printf("Hai un nuovo messaggio !\n");
+                    //recv(newfd, buffer, sizeof(buffer), 0);
 
-                    printf("\nDigita 'chat' \n");
+                    printf("Hai un nuovo messaggio !\n");
 
                     FD_SET(newfd, &master);                     // Aggiungo il nuovo socket al master
                     fdmax = (newfd > fdmax) ? newfd : fdmax;    // Aggiorno fdmax
@@ -738,12 +808,13 @@ int main(int argc, char* argv[]){
                     else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
 
                         //printf("Il comunicatore (socket %d) e' pronto\n", i);
-                        printf("E' arrivato il comando %s\n", command);
+                        //printf("E' arrivato il comando %s\n", command);
 
                         // Gestione registrazione
                         if(!strcmp(command, CMD_CHAT)){
 
-                            printf("Gestione CHAT\n");
+                            //printf("Gestione CHAT\n");
+                            printf("Hai un nuovo messaggio !\n");
                             dev_chat(i);
 
                         }
