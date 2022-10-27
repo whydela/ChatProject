@@ -520,13 +520,17 @@ bool first_chat(int sd, char username[1024]){
     // Connettiamo il Device al Server
     ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
 
+    // Se non riusciamo a connetterci, dobbiamo dirlo al device che ha richiesto la prima chat
     if(ret < 0){
         change_log(username);
         send_dv(sd, OFFLINE);
         return false;
     }
 
+    // Altrimenti inviamo la porta del device con cui vuole iniziare la chat
     send_dv(sd, dev_port);
+    
+    // Il return true sta per -> il device con cui vuoi iniziare la chat e' online
     return true;
 
 }
@@ -553,6 +557,7 @@ void dev_chat(int sd){
         // Si riceve l'username richiesto per una chat
         recv(sd, dev_usr, sizeof(dev_usr), 0);
 
+        // Prima di tutto controlliamo se il device e' registrato nel sistema
         fptr = fopen("srv/usr_log.txt", "r");
         fflush(fptr);
 
@@ -565,6 +570,7 @@ void dev_chat(int sd){
 
         fclose(fptr);
         
+        // Inviamo YES se il device esiste all'interno del sistema
         send_dv(sd, YES);
         
         recv(sd, buffer, sizeof(buffer), 0);
