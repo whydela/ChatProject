@@ -460,6 +460,8 @@ void crea_lista(int sd, char username[1024]){
 
     FILE* fptr, *fpptr;
 
+    printf("ENTRO\n");
+
     fptr = fopen("srv/usr_all.txt", "r");
     fpptr = fopen("srv/usr_online.txt", "r");
     
@@ -497,8 +499,8 @@ void crea_lista(int sd, char username[1024]){
 bool first_chat(int sd, char username[1024]){
 
     FILE* fptr;
-    struct sockaddr_in dev_addr;
-    int dev_sd, ret;
+    //struct sockaddr_in dev_addr;
+    //int dev_sd, ret;
     char dev_port[1024];
     char scorre[1024];
 
@@ -514,19 +516,26 @@ bool first_chat(int sd, char username[1024]){
         }
     }
 
+    fclose(fptr);
+
     // Il Server prova a connettersi al device
-    dev_sd = dev_config(&dev_addr, atoi(dev_port));
+    //dev_sd = dev_config(&dev_addr, atoi(dev_port));
 
     // Connettiamo il Device al Server
-    ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
+    //ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
 
-    // Se non riusciamo a connetterci, dobbiamo dirlo al device che ha richiesto la prima chat
-    if(ret < 0){
+    // Se e' offline, dobbiamo dirlo al device che ha richiesto la prima chat
+
+    fptr = fopen("srv/usr_online.txt", "r");
+    fflush(fptr);
+    if(!check_word(fptr, username)){
         change_log(username);
         send_dv(sd, OFFLINE);
+        fclose(fptr);
         return false;
     }
 
+    fclose(fptr);
     // Altrimenti inviamo la porta del device con cui vuole iniziare la chat
     send_dv(sd, dev_port);
     
@@ -545,13 +554,16 @@ void dev_chat(int sd){
     //char scorre[1024];
     char percorso[1024];
     char dev_usr[1024];
+    char try1[1024];
+    char try2[1024];
     //char dev_port[1024];
 
     FILE* fptr, * fpptr;
     // percorso -> srv/
     strcpy(percorso, "srv/");
+    strcpy(try1, "srv/chat/");
+    strcpy(try2, "srv/chat/");
     
-
     while(1){
 
         // Si riceve l'username richiesto per una chat
@@ -570,45 +582,40 @@ void dev_chat(int sd){
 
         fclose(fptr);
         
+        /*
         // Inviamo YES se il device esiste all'interno del sistema
-        send_dv(sd, YES);
-        
-        recv(sd, buffer, sizeof(buffer), 0);
-
+        //send_dv(sd, YES);
+        //recv(sd, buffer, sizeof(buffer), 0);
         // Se si riceve YES dal device, vuol dire che e' la prima chat
-        if(!strcmp(buffer, YES)){
+        */
 
-            if(first_chat(sd, dev_usr)){
-                printf("ESCO\n");
-                return;
-            }
-
-            // Adesso il server deve inoltrare il messaggio al mittente
-            recv(sd, buffer, sizeof(buffer), 0);
-            
-            // Si invia il messaggio in una directory contenente i messaggi pendenti
-            // percorso -> srv/dev_usr
-            strcat(percorso, dev_usr);
-            // Creiamo la cartella srv/dev_usr
-            mkdir(percorso, 0700);
-
-            // Creiamo la cartella dei messaggi pendenti srv/dev_usr/pendent
-            strcat(percorso, "/pendent");
-            mkdir(percorso, 0700);
-
-            strcat(percorso, "/");
-            strcat(percorso, username);
-            strcat(percorso, ".txt");
-
-            // Creiamo il file srv/dev_usr/pendent/username.txt
-            //printf("Il percorso e' %s\n", percorso);
-            fpptr = fopen(percorso, "a");
-            fflush(fpptr);
-            fprintf(fpptr, "%s\n", buffer);
-            fflush(fpptr);
+        if(first_chat(sd, dev_usr)){
+            printf("ESCO\n");
             return;
-
         }
+
+        // Adesso il server deve inoltrare il messaggio al mittente
+        recv(sd, buffer, sizeof(buffer), 0);
+        
+        // Si invia il messaggio in una directory contenente i messaggi pendenti
+        // percorso -> srv/dev_usr
+        strcat(percorso, dev_usr);
+        // Creiamo la cartella srv/dev_usr
+        mkdir(percorso, 0700);
+        // Creiamo la cartella dei messaggi pendenti srv/dev_usr/pendent
+        strcat(percorso, "/pendent");
+        mkdir(percorso, 0700);
+        strcat(percorso, "/");
+        strcat(percorso, username);
+        strcat(percorso, ".txt");
+        // Creiamo il file srv/dev_usr/pendent/username.txt
+        //printf("Il percorso e' %s\n", percorso);
+        fpptr = fopen(percorso, "a");
+        fflush(fpptr);
+        fprintf(fpptr, "%s\n", buffer);
+        fflush(fpptr);
+        return;
+        
         
         break;
 
@@ -760,6 +767,8 @@ int main(int argc, char *argv[]) {
 
     // Creo la cartella del Server
     mkdir("srv", 0700);
+    // Creo la cartella delle Chat
+    mkdir("srv/chat", 0700);
 
     // Aggiungo il listener al set master
     FD_SET(listener, &master);

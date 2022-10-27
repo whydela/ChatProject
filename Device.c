@@ -23,6 +23,8 @@
 #define OFFLINE "/OFFLINE\0"
 #define STDIN 0
 #define EXIT "\\q\0"
+#define FIRSTCHATOFF "/FIRSTCHATOFF\0"
+#define FIRSTCHATON "/FIRSTCHATON\0"
 
 char username[1024];                    // username del device
 char password[1024];                    // password del device
@@ -357,11 +359,11 @@ char* msg(bool online){
     strcat(stringa, buffer);
     strcat(messaggio, stringa);
     
-    /*if(online){
+    if(online){
         strcat(messaggio, " **");
     } else{
         strcat(messaggio, " *");
-    }*/
+    }
 
     return messaggio;
 
@@ -369,11 +371,10 @@ char* msg(bool online){
 
 void offline_chat(){
 
-
 }
 
 // La funzione sottostante si occupa della chat di entrambi i Device
-void chat(int sd){
+void chat(int sd, char dev_usr[1024]){
 
     fd_set master_chat;
     fd_set read_chat;
@@ -392,10 +393,20 @@ void chat(int sd){
     //FILE* fptr;
     char sent[1024];
     char coming[1024];
+    char buffer[1024];
     int ret;
-    //char buffer[1024];
+    FILE* fptr;
 
-    printf("SIamo qui\n");
+    strcpy(buffer, username);
+    strcat(buffer, "/chat");
+    mkdir(buffer, 0700);
+    strcat(buffer, "/");
+    strcat(buffer, dev_usr);
+    strcat(buffer, ".txt");
+    printf("Il percorso e' %s\n", buffer);
+
+    fptr = fopen(buffer, "a");
+    fflush(fptr);
 
     while(1){
 
@@ -419,11 +430,17 @@ void chat(int sd){
 
                     if(ret > 0){
                         printf("%s\n", sent);
+                        if(strcmp(sent, EXIT)){
+                            fflush(fptr);   
+                            fprintf(fptr, "%s\n", sent);
+                            fflush(fptr);
+                        }
                     }
 
                     if(!strcmp(sent, EXIT)){
                         printf("VOGLIO USCIRE\n\n");
                         chatting = false;
+                        fclose(fptr);
                         return;
                     }
                 }
@@ -441,6 +458,11 @@ void chat(int sd){
                             offline_chat();
                         } else{
                             printf("%s\n", coming);
+                            if(strcmp(sent, EXIT)){
+                                fflush(fptr);
+                                fprintf(fptr, "%s\n", coming);
+                                fflush(fptr);
+                            }
                         }
                         fflush(stdout);
                         fflush(stdin);
@@ -464,7 +486,7 @@ void chat_config(int sd){
     int dev_port;
     int dev_sd;
     int ret;
-    bool dev_friend = true;
+    //bool dev_friend = true;
     //bool dev_online = true;
 
     // Mandiamo il comando
@@ -496,8 +518,7 @@ void chat_config(int sd){
     fflush(fptr);
     if(!check_word(fptr, dev_usr)){
         // Cio' indica che e' la prima volta in cui il device chiede all'altro di comunicare
-        dev_friend = false;
-        //fprintf(fptr, "%s\n", dev_usr); //! QUESTO VA MESSO PIU' SOTTO
+        //dev_friend = false;
     }
     fclose(fptr);
     
@@ -513,28 +534,32 @@ void chat_config(int sd){
         }
 
         send_srv(sd, dev_usr);
-
+        printf("Mi fermo qui\n");
         recv(sd, buffer, sizeof(buffer), 0);
+        printf("Mi fermo qui1\n");
 
         if(!strcmp(buffer, NO)){
             printf("\nATTENZIONE ! Username non presente.\n");
             continue;
         }
-    
+
+
+
+        /*
         // Se e' la prima volta che gli manda un messaggio dice al server YES
-        if(!dev_friend){
-            send_srv(sd, YES);
-        } 
+        //if(!dev_friend){
+        //    send_srv(sd, YES);
+        //} 
         // Altrimenti gli invia NO 
-        else{
-            send_srv(sd, NO);
-        }
-
-        recv(sd, buffer, sizeof(buffer), 0);
-
+        //else{
+        //    send_srv(sd, NO);
+        //}
+        //recv(sd, buffer, sizeof(buffer), 0);
+        */
+        
         if(!strcmp(buffer, OFFLINE)){
 
-            printf("Username offline e non presente in rubrica, il messaggio verra' comunque inviato:\n\n-> ");
+            printf("Username offline, il messaggio verra' comunque inviato:\n\n-> ");
 
             send_srv(sd, msg(false));
             // Il NO indica che e' la prima volta che questo utente vuole parlare con lui
@@ -562,7 +587,8 @@ void chat_config(int sd){
 
     if(ret < 0){
         // Dispositivo offline
-        printf("Dispositivo offline\n"); 
+        printf("Dispositivo offline\n");
+        return;
         // dev_online = false;
     }
 
@@ -579,7 +605,7 @@ void chat_config(int sd){
 
     printf("Chat con %s iniziata !\n", dev_usr);
 
-    chat(dev_sd);
+    chat(dev_sd, dev_usr);
 
 }
 
@@ -638,16 +664,16 @@ void handler(int sig){
     }
 }
 
-void dev_chat(int sd){
+void dev_chat(int sd, char buffer[1024]){
     
-    chat(sd);
+    chat(sd, buffer);
 
 }
 
 int main(int argc, char* argv[]){
 
     int ret, srv_port;
-    char wait;
+    //char wait;
     struct sockaddr_in my_addr, srv_addr, dev_addr;
     char spacenter[1024];
     fd_set master;                                  // Set principale gestito dal programmatore con le macro 
@@ -846,12 +872,13 @@ int main(int argc, char* argv[]){
 
                             //printf("Gestione CHAT\n");
                             //printf("Hai un nuovo messaggio !\n");
-                            dev_chat(i);
+                            dev_chat(i, buffer);
 
                         }
                     } 
                     else{
                         perror("Errore nella reiceve: ");
+                        break;
                     }
                     break;
                 } 
