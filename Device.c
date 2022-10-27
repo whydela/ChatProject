@@ -18,6 +18,7 @@
 #define CMD_TMS "/TIMESTAMP\0"
 #define CMD_CHAT "/CHAT\0"
 #define CMD_OFF "/OFF"
+#define CMD_CHATOFF "/CHATOFF"
 #define YES "/YES\0"
 #define NO "/NO\0"
 #define OFFLINE "/OFFLINE\0"
@@ -152,6 +153,45 @@ int send_dev(int sd, char* cmd){
     ret = send(sd, cmd, strlen(cmd)+1, 0);
 
     return ret;
+}
+
+// Cleaner che cambia il singolo asterisco con quello doppio nelle chat
+void cleaner(char filename[1024]){
+    
+    FILE* fptr, *fpptr;
+    char buffer[1024];
+    char file[1024];
+    char file1[1024];
+
+    strcpy(file, filename);
+    strcpy(file1, filename);
+
+    strcat(file, ".txt");
+    strcat(file1, "1.txt");
+
+    fpptr = fopen(file, "r");
+    fptr = fopen(file1, "a+");
+
+    fflush(fpptr);
+    fflush(fptr);
+    while(fscanf(fpptr, "%s", buffer)==1){
+        //printf("Trovo %s\n", buffer);
+        fflush(fptr);
+        if(!strcmp(buffer, "*")){
+            fprintf(fptr, "**\n");
+        } else if(!strcmp(buffer, "**")){
+            fprintf(fptr, "**\n");
+        }
+        else{
+            fprintf(fptr, "%s ", buffer);
+        }
+        fflush(fptr);
+    }
+    fclose(fpptr);
+    fclose(fptr);
+
+    remove(file);
+    rename(file1, file);
 }
 
 void reg_config(int sd){
@@ -369,9 +409,51 @@ char* msg(bool online){
 
 }
 
-void offline_chat(){
+void offline_chat(int sd, char dev_usr[1024], FILE* fptr){
 
-}
+    char buffer[1024];
+    send_srv(sd, CMD_CHATOFF);
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(strcmp(buffer, RFD)){
+            continue;
+        }
+        send_srv(sd, dev_usr);
+        break;
+    }
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(strcmp(buffer, RFD)){
+            continue;
+        }
+        send_srv(sd, username);
+        break;
+    }
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(strcmp(buffer, RFD)){
+            continue;
+        }
+        while(1){
+            strcpy(buffer, msg(false));
+            if(!strcmp(buffer, EXIT)){
+                break;
+            }
+            else{
+                printf("%s\n", buffer);
+                fflush(fptr);
+                fprintf(fptr, "%s\n", buffer);
+                fflush(fptr);
+                send_srv(sd, buffer);
+            }
+        }
+        break;
+    }    
+
+}  
 
 // La funzione sottostante si occupa della chat di entrambi i Device
 void chat(int sd, char dev_usr[1024]){
@@ -402,6 +484,7 @@ void chat(int sd, char dev_usr[1024]){
     mkdir(buffer, 0700);
     strcat(buffer, "/");
     strcat(buffer, dev_usr);
+    cleaner(buffer);
     strcat(buffer, ".txt");
     printf("Il percorso e' %s\n", buffer);
 
@@ -455,14 +538,15 @@ void chat(int sd, char dev_usr[1024]){
                         if(!strcmp(coming, EXIT)){
                             printf("DEVICE USCITO\n");
                             online = false;
-                            offline_chat();
+                            offline_chat(srv_sd, dev_usr, fptr);
+                            return;
                         } else{
                             printf("%s\n", coming);
                             if(strcmp(sent, EXIT)){
                                 fflush(fptr);
                                 fprintf(fptr, "%s\n", coming);
                                 fflush(fptr);
-                            }
+                            } 
                         }
                         fflush(stdout);
                         fflush(stdin);
@@ -534,28 +618,12 @@ void chat_config(int sd){
         }
 
         send_srv(sd, dev_usr);
-        printf("Mi fermo qui\n");
         recv(sd, buffer, sizeof(buffer), 0);
-        printf("Mi fermo qui1\n");
 
         if(!strcmp(buffer, NO)){
             printf("\nATTENZIONE ! Username non presente.\n");
             continue;
         }
-
-
-
-        /*
-        // Se e' la prima volta che gli manda un messaggio dice al server YES
-        //if(!dev_friend){
-        //    send_srv(sd, YES);
-        //} 
-        // Altrimenti gli invia NO 
-        //else{
-        //    send_srv(sd, NO);
-        //}
-        //recv(sd, buffer, sizeof(buffer), 0);
-        */
         
         if(!strcmp(buffer, OFFLINE)){
 
@@ -567,15 +635,18 @@ void chat_config(int sd){
             return;
         }
 
+        // A questo punto il Server ci ha confermato che il device contattato e' online
+
+        // Il Server ci ha inviati la porta del Device
+        dev_port = atoi(buffer);
+
         fptr = fopen(percorso, "a+");
         fflush(fptr);
         if(!check_word(fptr, dev_usr)){
-            fprintf(fptr, "%s\n", dev_usr);
+            fprintf(fptr, "%s ", dev_usr);
+            fprintf(fptr, "%s\n", buffer);
         }
         fclose(fptr);
-
-        // A questo punto il Server ci ha inviati la porta del Device
-        dev_port = atoi(buffer);
 
         break;
     }
@@ -604,6 +675,8 @@ void chat_config(int sd){
     }
 
     printf("Chat con %s iniziata !\n", dev_usr);
+
+    srv_sd = sd;
 
     chat(dev_sd, dev_usr);
 
@@ -783,7 +856,8 @@ int main(int argc, char* argv[]){
     mkdir(username, 0700);
     strcpy(pendent, username);
     strcat(pendent, "/pendent");
-    mkdir(pendent, 0700);
+    rmdir(pendent);
+    //mkdir(pendent, 0700);
 
 
     while(1){

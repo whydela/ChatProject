@@ -18,8 +18,10 @@
 #define CMD_TMS "/TIMESTAMP\0"
 #define CMD_CHAT "/CHAT\0"
 #define CMD_OFF "/OFF"
+#define CMD_CHATOFF "/CHATOFF"
 #define YES "/YES\0"
 #define NO "/NO\0"
+#define EXIT "\\q\0"
 #define OFFLINE "/OFFLINE\0"
 
 char buffer[1024];
@@ -118,6 +120,19 @@ char* filetobuffer(FILE* fptr, char stringa[1024]){
 
     return buffer;
 
+}
+
+int count_lines(FILE* fptr){
+    int ch = 0;
+    int lines = 0;
+    fflush(fptr);
+    while(!feof(fptr)){
+        ch = fgetc(fptr);
+        if(ch == '\n'){
+            lines++;
+        }
+    }
+    return lines;
 }
 
 void change_log(char username[1024]){
@@ -460,7 +475,6 @@ void crea_lista(int sd, char username[1024]){
 
     FILE* fptr, *fpptr;
 
-    printf("ENTRO\n");
 
     fptr = fopen("srv/usr_all.txt", "r");
     fpptr = fopen("srv/usr_online.txt", "r");
@@ -496,7 +510,7 @@ void crea_lista(int sd, char username[1024]){
 
 }
 
-bool first_chat(int sd, char username[1024]){
+bool unreachable(int sd, char username[1024]){
 
     FILE* fptr;
     //struct sockaddr_in dev_addr;
@@ -518,12 +532,6 @@ bool first_chat(int sd, char username[1024]){
 
     fclose(fptr);
 
-    // Il Server prova a connettersi al device
-    //dev_sd = dev_config(&dev_addr, atoi(dev_port));
-
-    // Connettiamo il Device al Server
-    //ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
-
     // Se e' offline, dobbiamo dirlo al device che ha richiesto la prima chat
 
     fptr = fopen("srv/usr_online.txt", "r");
@@ -544,25 +552,68 @@ bool first_chat(int sd, char username[1024]){
 
 }
 
+void dev_chat_offline(int sd){
+
+    char percorso[1024];
+    char dev_usr[1024];
+    char buffer[1024];
+    char username[1024];
+    FILE *fpptr;
+
+
+    send_dv(sd, RFD);
+    recv(sd, dev_usr, sizeof(dev_usr), 0);
+
+    send_dv(sd, RFD);
+    recv(sd, username, sizeof(username), 0);
+
+    // Adesso il server deve inoltrare il messaggio al mittente
+    send_dv(sd, RFD);
+    
+    strcpy(percorso, "srv/");
+    strcat(percorso, dev_usr);
+    // Creiamo la cartella srv/dev_usr
+    mkdir(percorso, 0700);
+    // Creiamo la cartella dei messaggi pendenti srv/dev_usr/pendent
+    strcat(percorso, "/pendent");
+    mkdir(percorso, 0700);
+    strcat(percorso, "/");
+    strcat(percorso, username);
+    strcat(percorso, ".txt");
+    // Creiamo il file srv/dev_usr/pendent/username.txt
+    printf("Il percorso e' %s\n", percorso);
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(!strcmp(buffer, EXIT)){
+            return;
+        }
+        printf("%s\n", buffer);
+        // Si invia il messaggio in una directory contenente i messaggi pendenti
+        // percorso -> srv/dev_usr
+        fpptr = fopen(percorso, "a");
+        fflush(fpptr);
+        fprintf(fpptr, "%s\n", buffer);
+        fflush(fpptr);
+    }
+
+}
+
 void dev_chat(int sd){
 
     // Preparo la lista degli utenti online e offline
     char username[1024];
     crea_lista(sd, username);
     
-    //char buffer[1024];
+    char buffer[1024];
     //char scorre[1024];
     char percorso[1024];
     char dev_usr[1024];
-    char try1[1024];
-    char try2[1024];
     //char dev_port[1024];
 
     FILE* fptr, * fpptr;
     // percorso -> srv/
     strcpy(percorso, "srv/");
-    strcpy(try1, "srv/chat/");
-    strcpy(try2, "srv/chat/");
     
     while(1){
 
@@ -581,15 +632,8 @@ void dev_chat(int sd){
         }
 
         fclose(fptr);
-        
-        /*
-        // Inviamo YES se il device esiste all'interno del sistema
-        //send_dv(sd, YES);
-        //recv(sd, buffer, sizeof(buffer), 0);
-        // Se si riceve YES dal device, vuol dire che e' la prima chat
-        */
 
-        if(first_chat(sd, dev_usr)){
+        if(unreachable(sd, dev_usr)){
             printf("ESCO\n");
             return;
         }
@@ -615,13 +659,8 @@ void dev_chat(int sd){
         fprintf(fpptr, "%s\n", buffer);
         fflush(fpptr);
         return;
-        
-        
-        break;
 
     }
-
-    
 
 }
 
@@ -880,6 +919,11 @@ int main(int argc, char *argv[]) {
                             printf("Gestione out\n");
                             dev_out(i);
                         }
+
+                        else if(!strcmp(command, CMD_CHATOFF)){
+                            printf("Gestione chat offline\n");
+                            dev_chat_offline(i);
+                        } 
                     } 
                     else{
                         perror("Errore nella reiceve: ");
