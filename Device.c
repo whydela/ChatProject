@@ -18,15 +18,14 @@
 #define CMD_LOG "/LOGIN\0"
 #define CMD_TMS "/TIMESTAMP\0"
 #define CMD_CHAT "/CHAT\0"
-#define CMD_OFF "/OFF"
-#define CMD_CHATOFF "/CHATOFF"
+#define CMD_OFF "/OFF\0"
+#define CMD_CHATOFF "/CHATOFF\0"
+#define CMD_SHOW "/SHOW\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
 #define OFFLINE "/OFFLINE\0"
 #define STDIN 0
 #define EXIT "\\q\0"
-#define FIRSTCHATOFF "/FIRSTCHATOFF\0"
-#define FIRSTCHATON "/FIRSTCHATON\0"
 
 char username[1024];                    // username del device
 char password[1024];                    // password del device
@@ -564,7 +563,7 @@ void chat(int sd, char dev_usr[1024]){
                         fflush(stdin);
                         fflush(stdout);
                         if(!strcmp(coming, EXIT)){
-                            printf("ATTENZIONE ! %s e' uscito dalla chat.\n", dev_usr);
+                            printf("ATTENZIONE ! %s e' uscito dalla chat.\n\n", dev_usr);
                             online = false;
                             close(i);
                             offline_chat(srv_sd, dev_usr, fptr);
@@ -775,6 +774,26 @@ void out_config(int sd){
     //rmdir(username);
 }
 
+void show_config(int sd){
+
+    char buffer[1024];
+
+    send_srv(sd, CMD_SHOW);
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(!strcmp(buffer, RFD)){
+            send_srv(sd, username);
+            break;
+        }
+    }
+
+    recv(sd, buffer, sizeof(buffer), 0);
+
+    printf("%s", buffer);
+
+}
+
 void handler(int sig){
     
     //printf("Entro nell'handler\n");
@@ -790,11 +809,6 @@ void handler(int sig){
     }
 }
 
-void dev_chat(int sd, char buffer[1024]){
-    
-    chat(sd, buffer);
-
-}
 
 int main(int argc, char* argv[]){
 
@@ -1011,7 +1025,7 @@ int main(int argc, char* argv[]){
 
                             //printf("Gestione CHAT\n");
                             //printf("Hai un nuovo messaggio !\n");
-                            dev_chat(i, buffer);
+                            chat(i, buffer);
 
                         }
                     } 

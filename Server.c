@@ -17,8 +17,9 @@
 #define CMD_LOG "/LOGIN\0"
 #define CMD_TMS "/TIMESTAMP\0"
 #define CMD_CHAT "/CHAT\0"
-#define CMD_OFF "/OFF"
-#define CMD_CHATOFF "/CHATOFF"
+#define CMD_OFF "/OFF\0"
+#define CMD_CHATOFF "/CHATOFF\0"
+#define CMD_SHOW "/SHOW\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
 #define EXIT "\\q\0"
@@ -134,7 +135,7 @@ int count_lines(FILE* fptr){
         }
     }
     return lines;
-    
+
 }
 
 void change_log(char username[1024]){
@@ -675,6 +676,24 @@ void dev_chat(int sd){
 
 }
 
+void dev_show(int sd){
+
+    char buffer[1024];
+    char username[1024];
+    char percorso[1024];
+
+    strcpy(percorso, "srv/");
+
+    send_dv(sd, RFD);
+
+    recv(sd, username, sizeof(username), 0);
+
+    strcat(percorso, username);
+    strcat(username, "/pendent/");
+    
+
+}
+
 void dev_out(int sd){
 
     FILE* fptr, *fpptr;
@@ -775,8 +794,8 @@ void srv_help(){
 }
 
 int main(int argc, char *argv[]) {
+    
     // Dichiarazioni Variabili
-
     int port;                                       // Porta a cui e' associato il Server
     int ret;                                        // Variabile di controllo
     fd_set master;                                  // Set principale gestito dal programmatore con le macro 
@@ -924,6 +943,11 @@ int main(int argc, char *argv[]) {
                         else if(!strcmp(command, CMD_CHAT)){
                             printf("Gestione chat\n");
                             dev_chat(i);
+                        }
+
+                        else if(!strcmp(command, CMD_SHOW)){
+                            printf("Gestione show\n");
+                            dev_show(i);
                         }
 
                         else if(!strcmp(command, CMD_OFF)){
