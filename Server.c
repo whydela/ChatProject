@@ -123,6 +123,7 @@ char* filetobuffer(FILE* fptr, char stringa[1024]){
 }
 
 int count_lines(FILE* fptr){
+
     int ch = 0;
     int lines = 0;
     fflush(fptr);
@@ -133,6 +134,7 @@ int count_lines(FILE* fptr){
         }
     }
     return lines;
+    
 }
 
 void change_log(char username[1024]){
@@ -475,9 +477,8 @@ void crea_lista(int sd, char username[1024]){
 
     FILE* fptr, *fpptr;
 
-
     fptr = fopen("srv/usr_all.txt", "r");
-    fpptr = fopen("srv/usr_online.txt", "r");
+    fflush(fptr);
     
     // Ready for data
     send_dv(sd, RFD);
@@ -488,11 +489,18 @@ void crea_lista(int sd, char username[1024]){
     memset(lista, 0, sizeof(lista));        // Pulizia
 
     while(fscanf(fptr, "%s", scorre)==1){
+
+        fpptr = fopen("srv/usr_online.txt", "r");
+        fflush(fpptr);
+        
         // Se si trova lo stesso username si ignora
         if(!strcmp(scorre, username)){
             continue;
         }
-        printf("%s\n", scorre);
+
+        printf("Vedo %s\n", scorre);
+        fflush(fptr);
+
         // Se e' online
         if(check_word(fpptr, scorre)){
            strcat(scorre, ", ONLINE.");
@@ -503,7 +511,10 @@ void crea_lista(int sd, char username[1024]){
         }
         strcat(scorre, "\n");
         strcat(lista, scorre);
+        fclose(fpptr); 
     }
+
+    fclose(fptr);
 
     // Inviamo al device la lista
     send_dv(sd, lista);

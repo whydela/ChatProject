@@ -10,6 +10,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 bool check_word(FILE* ptr, char stringa[1024]){
 
@@ -43,29 +44,14 @@ int main(){
     sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
     timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
     
-    fp = fopen("diego/chat/lore.txt", "r");
-    fptr = fopen("diego/chat/lore1.txt", "a+");
-    fflush(fp);
-    fflush(fptr);
-    while(fscanf(fp, "%s", buffer)==1){
-        //printf("Trovo %s\n", buffer);
-        fflush(fptr);
-        if(!strcmp(buffer, "*")){
-            fprintf(fptr, "**\n");
-        } else if(!strcmp(buffer, "**")){
-            fprintf(fptr, "**\n");
+    DIR *mydir;
+    struct dirent *myfile;
+
+    mydir = opendir("diego");
+    while((myfile = readdir(mydir)) != NULL) {
+        if(!strcmp(myfile->d_name, "rubrica.txt")){
+            printf("%s\n", myfile->d_name);
         }
-        else{
-            fprintf(fptr, "%s ", buffer);
-        }
-        fflush(fptr);
     }
-    fclose(fp);
-    fclose(fptr);
-
-    remove("diego/chat/lore.txt");
-    rename("diego/chat/lore1.txt", "diego/chat/lore.txt");
-
-
-    printf("%d\n", i);
+    closedir(mydir);
 }

@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <dirent.h>
 
 #define RFD "RFD\0"
 #define CMD_REG "/REG\0"
@@ -142,7 +143,7 @@ void send_srv(int sd, char* cmd){
     //printf("Invio %s\n", cmd);
     send(sd, cmd, strlen(cmd)+1, 0);
 
-    printf("Messaggio %s inviato\n", cmd);
+    //printf("Messaggio %s inviato\n", cmd);
     
 }
 
@@ -153,6 +154,21 @@ int send_dev(int sd, char* cmd){
     ret = send(sd, cmd, strlen(cmd)+1, 0);
 
     return ret;
+}
+
+bool ls(char* directory, char* file){
+
+    DIR *mydir;
+    struct dirent *myfile;
+
+    mydir = opendir(directory);
+    while((myfile = readdir(mydir)) != NULL) {
+        if(!strcmp(myfile->d_name, file)){
+            return true;
+        }
+    }
+    closedir(mydir);
+    return false;
 }
 
 // Cleaner che cambia il singolo asterisco con quello doppio nelle chat
@@ -168,8 +184,10 @@ void cleaner(char filename[1024]){
 
     strcat(file, ".txt");
     strcat(file1, "1.txt");
+    printf("%s\n", file);
+    printf("%s\n", file1);
 
-    fpptr = fopen(file, "r");
+    fpptr = fopen(file, "a+");
     fptr = fopen(file1, "a+");
 
     fflush(fpptr);
@@ -439,6 +457,7 @@ void offline_chat(int sd, char dev_usr[1024], FILE* fptr){
         }
         while(1){
             strcpy(buffer, msg(false));
+            send_srv(sd, buffer);
             if(!strcmp(buffer, EXIT)){
                 break;
             }
@@ -447,7 +466,6 @@ void offline_chat(int sd, char dev_usr[1024], FILE* fptr){
                 fflush(fptr);
                 fprintf(fptr, "%s\n", buffer);
                 fflush(fptr);
-                send_srv(sd, buffer);
             }
         }
         break;
@@ -487,6 +505,16 @@ void chat(int sd, char dev_usr[1024]){
     cleaner(buffer);
     strcat(buffer, ".txt");
     printf("Il percorso e' %s\n", buffer);
+
+    printf("Chat con %s iniziata !\n\n", dev_usr);
+    printf("--->");
+    printf(" Per uscire dalla chat digitare '\\q'\n");
+    printf("--->");
+    printf(" Per aggiungere un partecipante digitare '\\u'\n");
+    printf("--->");
+    printf(" Per condividere un file digitare 'share nomefile'\n");
+    printf("--->");
+    printf(" Per uscire dalla chat digitare '\\q'\n\n");
 
     fptr = fopen(buffer, "a");
     fflush(fptr);
@@ -536,8 +564,9 @@ void chat(int sd, char dev_usr[1024]){
                         fflush(stdin);
                         fflush(stdout);
                         if(!strcmp(coming, EXIT)){
-                            printf("DEVICE USCITO\n");
+                            printf("ATTENZIONE ! %s e' uscito dalla chat.\n", dev_usr);
                             online = false;
+                            close(i);
                             offline_chat(srv_sd, dev_usr, fptr);
                             return;
                         } else{
@@ -550,7 +579,6 @@ void chat(int sd, char dev_usr[1024]){
                         }
                         fflush(stdout);
                         fflush(stdin);
-
                     }
 
                 }
@@ -674,11 +702,35 @@ void chat_config(int sd){
         break;
     }
 
-    printf("Chat con %s iniziata !\n", dev_usr);
-
     srv_sd = sd;
 
-    chat(dev_sd, dev_usr);
+    printf("In attesa che %s accetti la chat...\n", dev_usr);
+
+    while(1){
+
+        recv(dev_sd, buffer, sizeof(buffer), 0);
+        if(!strcmp(buffer, RFD)){
+            chat(dev_sd, dev_usr);
+            break;
+        }
+
+        else if(!strcmp(buffer, NO)){
+            strcpy(buffer, username);
+            strcat(buffer, "/chat");
+            mkdir(buffer, 0700);
+            strcat(buffer, "/");
+            strcat(buffer, dev_usr);
+            strcat(buffer, ".txt");
+            fflush(fptr);
+            fptr = fopen(buffer, "a");
+            fflush(fptr);
+            printf("\nATTENZIONE ! %s ha rifiutato la chat !\n", dev_usr);
+            printf("\nLa chat e' stata aperta, i messaggi verranno comunque inviati\n");
+            offline_chat(srv_sd, dev_usr, fptr);
+            break;
+        }
+    }
+
 
 }
 
@@ -733,6 +785,7 @@ void handler(int sig){
 
     if(online){
         out_config(srv_sd);
+        printf("\n");
         exit(0);
     }
 }
@@ -746,7 +799,6 @@ void dev_chat(int sd, char buffer[1024]){
 int main(int argc, char* argv[]){
 
     int ret, srv_port;
-    //char wait;
     struct sockaddr_in my_addr, srv_addr, dev_addr;
     char spacenter[1024];
     fd_set master;                                  // Set principale gestito dal programmatore con le macro 
@@ -756,6 +808,7 @@ int main(int argc, char* argv[]){
     int newfd;                                      // Socket di comunicazione
     char buffer[1024];
     char command[1024];
+    char wait[1024];
     int i;
     int addrlen;
 
@@ -937,12 +990,24 @@ int main(int argc, char* argv[]){
 
                         // Gestione registrazione
                         if(!strcmp(command, CMD_CHAT)){
-                            
+
                             send_dev(i, RFD);
 
                             recv(i, buffer, sizeof(buffer), 0);
 
-                            printf("Hai un nuovo messaggio da %s !\n", buffer);
+                            printf("%s vuole iniziare una chat con te !\n\n", buffer);
+
+                            printf("---> Digita qualsiasi cosa per entrare nella chat.\n");
+                            printf("---> Se si vuole rifutare la chat digitare '\\q'.\n\n");
+
+                            scanf("%s", wait);
+
+                            if(!strcmp(wait, EXIT)){
+                                send_dev(i, NO);
+                                break;
+                            }
+
+                            send_dev(i, RFD);
 
                             //printf("Gestione CHAT\n");
                             //printf("Hai un nuovo messaggio !\n");
