@@ -10,15 +10,17 @@
 #include <time.h>
 #include <stdbool.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 #define STDIN 0
 #define RFD "RFD\0"
-#define CMD_REG "/REG\0"
-#define CMD_LOG "/LOGIN\0"
-#define CMD_TMS "/TIMESTAMP\0"
 #define CMD_CHAT "/CHAT\0"
-#define CMD_OFF "/OFF\0"
 #define CMD_CHATOFF "/CHATOFF\0"
+#define CMD_HANGING "/HANGING\0"
+#define CMD_LOG "/LOGIN\0"
+#define CMD_OFF "/OFF\0"
+#define CMD_TMS "/TIMESTAMP\0"
+#define CMD_REG "/REG\0"
 #define CMD_SHOW "/SHOW\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
@@ -81,10 +83,10 @@ int dev_config(struct sockaddr_in* dev_addr, int dev_port){
 
     int sd;
     
-    sd = socket(AF_INET, SOCK_STREAM, 0);   // Creazione socket
+    sd = socket(AF_INET, SOCK_STREAM, 0);           // Creazione socket
     memset(dev_addr, 0, sizeof(*dev_addr));         // Pulizia
 
-    (*dev_addr).sin_family = AF_INET;          // Address family
+    (*dev_addr).sin_family = AF_INET;               // Address family
     (*dev_addr).sin_port = htons(dev_port);
 
     return sd;
@@ -123,10 +125,30 @@ char* filetobuffer(FILE* fptr, char stringa[1024]){
 
 }
 
+bool ls(char* directory, char* file){
+
+    DIR *mydir;
+    struct dirent *myfile;
+
+    mydir = opendir(directory);
+    
+    while((myfile = readdir(mydir)) != NULL) {
+        if(!strcmp(myfile->d_name, file)){
+            return true;
+        }
+    }
+
+    closedir(mydir);
+    
+    return false;
+
+}
+
 int count_lines(FILE* fptr){
 
     int ch = 0;
     int lines = 0;
+
     fflush(fptr);
     while(!feof(fptr)){
         ch = fgetc(fptr);
@@ -676,11 +698,16 @@ void dev_chat(int sd){
 
 }
 
-void dev_show(int sd){
+void 
 
-    char buffer[1024];
+void dev_hanging(int sd){
+
+    char dev_usr[1024];
     char username[1024];
     char percorso[1024];
+    char filename[1024];
+    char buffer[1024];
+    FILE* fptr, *fpptr;
 
     strcpy(percorso, "srv/");
 
@@ -689,8 +716,35 @@ void dev_show(int sd){
     recv(sd, username, sizeof(username), 0);
 
     strcat(percorso, username);
-    strcat(username, "/pendent/");
+    strcat(percorso, "/pendent/");
+
     
+    fptr = fopen("srv/usr_all.txt", "r");
+    fflush(fptr);
+
+    while(fscanf(fptr, "%s", dev_usr)==1){
+        
+        strcpy(buffer, percorso);
+
+        strcpy(filename, dev_usr);
+        strcat(filename, ".txt");
+        
+        strcat(buffer, filename);
+
+        printf("%s\n", buffer);
+
+        fpptr = fopen(filename, "r");
+        if(!fpptr) {
+            continue;
+        }
+        fflush(fpptr);
+
+        
+
+        fclose(fpptr);            
+    }
+
+    fclose(fptr);
 
 }
 
@@ -945,9 +999,14 @@ int main(int argc, char *argv[]) {
                             dev_chat(i);
                         }
 
+                        else if(!strcmp(command, CMD_HANGING)){
+                            printf("Gestione hanging\n");
+                            dev_hanging(i);
+                        }
+
                         else if(!strcmp(command, CMD_SHOW)){
                             printf("Gestione show\n");
-                            dev_show(i);
+                            //dev_show(i);
                         }
 
                         else if(!strcmp(command, CMD_OFF)){
@@ -958,7 +1017,8 @@ int main(int argc, char *argv[]) {
                         else if(!strcmp(command, CMD_CHATOFF)){
                             printf("Gestione chat offline\n");
                             dev_chat_offline(i);
-                        } 
+                        }
+
                     } 
                     else{
                         perror("Errore nella reiceve: ");

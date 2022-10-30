@@ -20,6 +20,7 @@
 #define CMD_CHAT "/CHAT\0"
 #define CMD_OFF "/OFF\0"
 #define CMD_CHATOFF "/CHATOFF\0"
+#define CMD_HANGING "/HANGING\0"
 #define CMD_SHOW "/SHOW\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
@@ -774,6 +775,24 @@ void out_config(int sd){
     //rmdir(username);
 }
 
+void hanging_config(int sd){
+
+    char buffer[1024];
+
+    send_srv(sd, CMD_HANGING);
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(!strcmp(buffer, RFD)){
+            send_srv(sd, username);
+            break;
+        }
+    }
+
+
+
+}
+
 void show_config(int sd){
 
     char buffer[1024];
@@ -947,6 +966,7 @@ int main(int argc, char* argv[]){
                     if(!strcmp(buffer, "hanging")){
                         // Gestione comando hanging
                         printf("Gestione comando %s\n", buffer);
+                        hanging_config(srv_sd);
                     }
 
                     else if(!strcmp(buffer, "show")){

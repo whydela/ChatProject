@@ -44,14 +44,12 @@ int main(){
     sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
     timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
     
-    DIR *mydir;
-    struct dirent *myfile;
+    fptr = fopen("srv/usr_all.txt", "r");
 
-    mydir = opendir("diego");
-    while((myfile = readdir(mydir)) != NULL) {
-        if(!strcmp(myfile->d_name, "rubrica.txt")){
-            printf("%s\n", myfile->d_name);
-        }
+    while(fscanf(fptr, "%s", buffer)==1){
+        strcat(buffer, ".txt");
+        printf("%s\n", buffer);    
     }
-    closedir(mydir);
+
+
 }
