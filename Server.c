@@ -28,6 +28,7 @@
 #define OFFLINE "/OFFLINE\0"
 
 char buffer[1024];
+char messaggio[1024];
 
 
 void first_print(){
@@ -698,7 +699,57 @@ void dev_chat(int sd){
 
 }
 
-void 
+char* hang_msg(char percorso[1024]){
+
+    char buffer[1024];
+    char stringa[1024];
+    char timestamp[1024];
+    int lines;
+    FILE* fptr;
+    int i = 1;  // current line
+    int j = 0;  // current word
+    bool timestamped = false;
+    bool dev_usred;
+
+    printf("%s\n", percorso);
+
+    fptr = fopen(percorso, "r");
+    fflush(fptr);
+    lines = count_lines(fptr);
+    fclose(fptr);
+    fptr = fopen(percorso, "r");
+    fflush(fptr);
+
+    while(fscanf(fptr, "%s", buffer)==1){
+        //printf("buffer = %s, j = %d, i = %d, lines = %d.\n", buffer, j, i, lines);
+        if(i==lines && !timestamped){   // Se siamo nell'ultima linea
+            // Estraiamo il timestamp, che è la prima stringa 
+            strcpy(timestamp, buffer);
+            timestamped = true;
+        }
+
+        if(++j == 2 && !dev_usred){
+            strcpy(stringa, buffer);
+            dev_usred = true;
+        }
+
+        if(!strcmp(buffer, "*")){   // Questa è l'ultima stringa della linea quindi passeremo a quella successiva
+            i++;
+        }
+
+    }
+
+    memset(messaggio, 0, sizeof(messaggio));
+
+    sprintf(messaggio, "\nMessaggi ricevuti da %s %d.\n", stringa, lines);
+    sprintf(buffer, "Timestamp del piu' recente: %s.\n", timestamp);
+    strcat(messaggio, buffer);
+
+    //printf("%s\n", messaggio);
+
+    return messaggio;
+
+}
 
 void dev_hanging(int sd){
 
@@ -707,6 +758,7 @@ void dev_hanging(int sd){
     char percorso[1024];
     char filename[1024];
     char buffer[1024];
+    char msg[1024];
     FILE* fptr, *fpptr;
 
     strcpy(percorso, "srv/");
@@ -731,20 +783,22 @@ void dev_hanging(int sd){
         
         strcat(buffer, filename);
 
-        printf("%s\n", buffer);
+        //printf("%s\n", buffer);
 
-        fpptr = fopen(filename, "r");
-        if(!fpptr) {
+        fpptr = fopen(buffer, "r");
+        
+        if(!fpptr){
             continue;
         }
-        fflush(fpptr);
 
+        fclose(fpptr);
+
+        // Questa funzione prepara il messaggio da inviare al Device
+        strcat(msg, hang_msg(buffer));
         
-
-        fclose(fpptr);            
     }
 
-    fclose(fptr);
+    printf("%s", msg);
 
 }
 
