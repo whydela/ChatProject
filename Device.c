@@ -788,8 +788,14 @@ void hanging_config(int sd){
             break;
         }
     }
+    
+    recv(sd, buffer, sizeof(buffer), 0);
 
+    printf("%s", buffer);
 
+    printf("\nDigitare qualsiasi cosa per presa visione.\n");
+
+    scanf("%s", buffer);
 
 }
 

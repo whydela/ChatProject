@@ -798,7 +798,7 @@ void dev_hanging(int sd){
         
     }
 
-    printf("%s", msg);
+    send_dv(sd, msg);
 
 }
 
