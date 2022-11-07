@@ -109,16 +109,24 @@ bool check_word(FILE* ptr, char stringa[1024]){
     return false;
 }
 
-char* filetobuffer(FILE* fptr, char stringa[1024]){
+char* filetobuffer(FILE* fptr){
 
     char scorre[1024];
-
+    bool timestamp = true;
     memset(buffer, 0, sizeof(*buffer));         // Pulizia della variabile globale
     while(fscanf(fptr, "%s", scorre)==1){
-        if(!strcmp(scorre, stringa)){
+        if(timestamp){
+            strcat(scorre, "\t");
+            timestamp = false;
+        }
+        if(!strcmp(scorre, "*")){
+            strcat(buffer, "\n");
+            timestamp = true;
             continue;
         }
-        strcat(scorre, "\n");
+        else{
+            strcat(scorre, " ");
+        }
         strcat(buffer, scorre);
     }
 
@@ -802,6 +810,49 @@ void dev_hanging(int sd){
 
 }
 
+void dev_show(int sd){
+
+    char dev_usr[1024];
+    char username[1024];
+    char percorso[1024];
+    //char filename[1024];
+    //char buffer[1024];
+    char msg[1024];
+    FILE* fptr;
+
+    send_dv(sd, RFD);
+
+    recv(sd, username, sizeof(username), 0);
+
+    send_dv(sd, RFD);
+
+    recv(sd, dev_usr, sizeof(dev_usr), 0);
+
+    fptr = fopen("srv/usr_all.txt", "r");
+    fflush(fptr);
+
+    if(!check_word(fptr, dev_usr)){
+        send_dv(sd, NO);
+        return;
+    }
+
+    fclose(fptr);
+
+    strcpy(percorso, "srv/");
+    strcat(percorso, username);
+    strcat(percorso, "/pendent/");
+    strcat(percorso, dev_usr);
+    strcat(percorso, ".txt");
+
+    printf("Il percorso e' %s\n", percorso);
+
+    fptr = fopen(percorso, "r");
+    fflush(fptr);
+    strcpy(msg, filetobuffer(fptr));    
+    send_dv(sd, msg);
+
+}
+
 void dev_out(int sd){
 
     FILE* fptr, *fpptr;
@@ -944,8 +995,6 @@ int main(int argc, char *argv[]) {
 
     // Creo la cartella del Server
     mkdir("srv", 0700);
-    // Creo la cartella delle Chat
-    mkdir("srv/chat", 0700);
 
     // Aggiungo il listener al set master
     FD_SET(listener, &master);
@@ -976,7 +1025,8 @@ int main(int argc, char *argv[]) {
 
                     else if(!strcmp(buffer, "esc")){
                         // Gestione comando esc
-                        // Per ora esco
+                        FILE* fptr = fopen("srv/usr_online.txt", "w+");
+                        fclose(fptr);
                         exit(0);
                     }
 
@@ -1060,7 +1110,7 @@ int main(int argc, char *argv[]) {
 
                         else if(!strcmp(command, CMD_SHOW)){
                             printf("Gestione show\n");
-                            //dev_show(i);
+                            dev_show(i);
                         }
 
                         else if(!strcmp(command, CMD_OFF)){

@@ -35,6 +35,7 @@ char percorso[1024];                    // percorso: username/file.txt
 char rubrica[1024];                     // rubrica
 char pendent[1024];
 char messaggio[1024];                   // messaggio della chat
+char all_chat[1024];
 
 int my_port;                            // porta del device
 int srv_sd;
@@ -73,6 +74,35 @@ bool check_word(FILE* ptr, char stringa[1024]){
     }
 
     return false;
+}
+
+char* filetobuffer(FILE* fptr){
+
+    char scorre[1024];
+    bool timestamp = true;
+    memset(all_chat, 0, sizeof(all_chat));         // Pulizia della variabile globale
+    while(fscanf(fptr, "%s", scorre)==1){
+        if(timestamp){
+            strcat(scorre, "\t");
+            timestamp = false;
+        }
+        if(!strcmp(scorre, "**")){
+            strcat(all_chat, "**\n");
+            timestamp = true;
+            continue;
+        } else if(!strcmp(scorre, "***")){
+            strcat(all_chat, "\n");
+            timestamp = true;
+            continue;
+        }
+        else{
+            strcat(scorre, " ");
+        }
+        strcat(all_chat, scorre);
+    }
+
+    return all_chat;
+
 }
 
 int ip_config(struct sockaddr_in* addr, int port){
@@ -183,9 +213,7 @@ void cleaner(char filename[1024]){
     strcpy(file1, filename);
 
     strcat(file, ".txt");
-    strcat(file1, "1.txt");
-    printf("%s\n", file);
-    printf("%s\n", file1);
+    strcat(file1, "1.txt"); 
 
     fpptr = fopen(file, "a+");
     fptr = fopen(file1, "a+");
@@ -199,6 +227,8 @@ void cleaner(char filename[1024]){
             fprintf(fptr, "**\n");
         } else if(!strcmp(buffer, "**")){
             fprintf(fptr, "**\n");
+        } else if(!strcmp(buffer, "***")){
+            fprintf(fptr, "***\n");
         }
         else{
             fprintf(fptr, "%s ", buffer);
@@ -382,7 +412,7 @@ void second_print(){
 }
 
 // La funzione sottostante prepara il messaggio da inviare nella chat
-char* msg(bool online){
+char* msg(){
 
     char timestamp[1024];
     char buffer[1024];
@@ -402,7 +432,7 @@ char* msg(bool online){
     strcpy(messaggio, "[");
     strcat(messaggio, timestamp);
     strcat(messaggio, "]");
-    strcat(messaggio, "\t");
+    strcat(messaggio, " \t ");
     strcat(messaggio, username);
     strcat(messaggio, ": ");
 
@@ -417,11 +447,11 @@ char* msg(bool online){
     strcat(stringa, buffer);
     strcat(messaggio, stringa);
     
-    if(online){
+    /*if(online){
         strcat(messaggio, " **");
     } else{
         strcat(messaggio, " *");
-    }
+    }*/
 
     return messaggio;
 
@@ -456,24 +486,25 @@ void offline_chat(int sd, char dev_usr[1024], FILE* fptr){
             continue;
         }
         while(1){
-            strcpy(buffer, msg(false));
-            send_srv(sd, buffer);
+            strcpy(buffer, msg());
             if(!strcmp(buffer, EXIT)){
+                send_srv(sd, buffer);
                 break;
             }
-            else{
-                printf("%s\n", buffer);
-                fflush(fptr);
-                fprintf(fptr, "%s\n", buffer);
-                fflush(fptr);
-            }
+            strcat(buffer, " *");
+            send_srv(sd, buffer);
+            printf("%s\n", buffer);
+            fflush(fptr);
+            fprintf(fptr, "%s\n", buffer);
+            fflush(fptr);
+            
         }
         break;
     }    
 
 }  
 
-// La funzione sottostante si occupa della chat di entrambi i Device
+// La funzione sottostante si occupa della chat dei Device
 void chat(int sd, char dev_usr[1024]){
 
     fd_set master_chat;
@@ -490,10 +521,10 @@ void chat(int sd, char dev_usr[1024]){
     FD_SET(sd, &master_chat);
 
     fdmax = sd;
-    //FILE* fptr;
     char sent[1024];
     char coming[1024];
     char buffer[1024];
+    char chatt[1024];
     int ret;
     FILE* fptr;
 
@@ -504,17 +535,20 @@ void chat(int sd, char dev_usr[1024]){
     strcat(buffer, dev_usr);
     cleaner(buffer);
     strcat(buffer, ".txt");
-    printf("Il percorso e' %s\n", buffer);
+    //printf("Il percorso e' %s\n", buffer);
+
 
     printf("Chat con %s iniziata !\n\n", dev_usr);
-    printf("--->");
-    printf(" Per uscire dalla chat digitare '\\q'\n");
     printf("--->");
     printf(" Per aggiungere un partecipante digitare '\\u'\n");
     printf("--->");
     printf(" Per condividere un file digitare 'share nomefile'\n");
     printf("--->");
     printf(" Per uscire dalla chat digitare '\\q'\n\n");
+    fptr = fopen(buffer, "r");
+    strcpy(chatt, filetobuffer(fptr));
+    printf("%s", chatt);
+    fclose(fptr);
 
     fptr = fopen(buffer, "a");
     fflush(fptr);
@@ -535,25 +569,27 @@ void chat(int sd, char dev_usr[1024]){
                     memset(coming, 0, sizeof(coming));
 
                     // Elaboriamo il messaggio
-                    strcpy(sent, msg(online));
+                    strcpy(sent, msg());
 
-                    ret = send_dev(sd, sent);
-
-                    if(ret > 0){
-                        printf("%s\n", sent);
-                        if(strcmp(sent, EXIT)){
-                            fflush(fptr);   
-                            fprintf(fptr, "%s\n", sent);
-                            fflush(fptr);
-                        }
-                    }
+                    send_dev(sd, sent);
 
                     if(!strcmp(sent, EXIT)){
-                        printf("VOGLIO USCIRE\n\n");
+                        //printf("VOGLIO USCIRE\n\n");
                         chatting = false;
                         fclose(fptr);
                         return;
                     }
+
+                    if(online){
+                        strcat(sent, " **");
+                    } else{
+                        strcat(sent, " *");
+                    }
+                    printf("%s\n", sent);
+                    fflush(fptr);   
+                    fprintf(fptr, "%s\n", sent);
+                    fflush(fptr);
+                        
                 }
 
                 else if(i == sd){
@@ -571,6 +607,7 @@ void chat(int sd, char dev_usr[1024]){
                             return;
                         } else{
                             printf("%s\n", coming);
+                            strcat(coming, " ***");
                             if(strcmp(sent, EXIT)){
                                 fflush(fptr);
                                 fprintf(fptr, "%s\n", coming);
@@ -802,6 +839,7 @@ void hanging_config(int sd){
 void show_config(int sd){
 
     char buffer[1024];
+    char dev_usr[1024];
 
     send_srv(sd, CMD_SHOW);
 
@@ -813,9 +851,26 @@ void show_config(int sd){
         }
     }
 
+    scanf("%s", dev_usr);
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(!strcmp(buffer, RFD)){
+            send_srv(sd, dev_usr);
+            break;
+        }
+    }
+
     recv(sd, buffer, sizeof(buffer), 0);
+    
+    if(!strcmp(buffer, NO)){
+        printf("ATTENZIONE ! L'username indicato non e' esistente.\n");
+        return;
+    }
 
     printf("%s", buffer);
+
+
 
 }
 
@@ -978,8 +1033,7 @@ int main(int argc, char* argv[]){
                     else if(!strcmp(buffer, "show")){
                         // Gestione comando show
                         printf("Gestione comando %s\n", buffer);
-                        scanf("%s", buffer);
-                        printf("%s\n", buffer);
+                        show_config(srv_sd);
                     }
 
                     else if(!strcmp(buffer, "chat")){
