@@ -120,7 +120,7 @@ char* filetobuffer(FILE* fptr){
             timestamp = false;
         }
         if(!strcmp(scorre, "*")){
-            strcat(buffer, "\n");
+            strcat(buffer, "***\n");
             timestamp = true;
             continue;
         }
@@ -729,7 +729,7 @@ char* hang_msg(char percorso[1024]){
     fflush(fptr);
 
     while(fscanf(fptr, "%s", buffer)==1){
-        //printf("buffer = %s, j = %d, i = %d, lines = %d.\n", buffer, j, i, lines);
+        printf("buffer = %s, j = %d, i = %d, lines = %d.\n", buffer, j, i, lines);
         if(i==lines && !timestamped){   // Se siamo nell'ultima linea
             // Estraiamo il timestamp, che è la prima stringa 
             strcpy(timestamp, buffer);
@@ -768,7 +768,8 @@ void dev_hanging(int sd){
     char buffer[1024];
     char msg[1024];
     FILE* fptr, *fpptr;
-
+    memset(msg, 0, sizeof(msg));
+    memset(buffer, 0, sizeof(buffer));
     strcpy(percorso, "srv/");
 
     send_dv(sd, RFD);
@@ -844,12 +845,14 @@ void dev_show(int sd){
     strcat(percorso, dev_usr);
     strcat(percorso, ".txt");
 
-    printf("Il percorso e' %s\n", percorso);
+    //printf("Il percorso e' %s\n", percorso);
 
     fptr = fopen(percorso, "r");
     fflush(fptr);
     strcpy(msg, filetobuffer(fptr));    
     send_dv(sd, msg);
+    fptr = fopen(percorso, "w+");
+    fflush(fptr);
 
 }
 

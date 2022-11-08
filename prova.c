@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
+char buffer[1024];
+
 bool check_word(FILE* ptr, char stringa[1024]){
 
     printf("Checkiamo la parola %s\n", stringa);
@@ -28,34 +30,41 @@ bool check_word(FILE* ptr, char stringa[1024]){
     return false;
 }
 
-int count_lines(FILE* fptr){
+char* filetobuffer(FILE* fptr){
 
-    int ch = 0;
-    int lines = 0;
-
-    fflush(fptr);
-    while(!feof(fptr)){
-        ch = fgetc(fptr);
-        if(ch == '\n'){
-            lines++;
+    char scorre[1024];
+    bool timestamp = true;
+    memset(buffer, 0, sizeof(*buffer));         // Pulizia della variabile globale
+    while(fscanf(fptr, "%s", scorre)==1){
+        if(timestamp){
+            strcat(scorre, "\t");
+            timestamp = false;
         }
+        if(!strcmp(scorre, "*")){
+            strcat(buffer, "***\n");
+            timestamp = true;
+            continue;
+        }
+        else{
+            strcat(scorre, " ");
+        }
+        strcat(buffer, scorre);
     }
-    fclose(fptr);
-    return lines;
+
+    return buffer;
 
 }
 
 int main(){
 
     FILE* fp, *fptr;
-    char buffer[1024];
     char carattere;
-    char stringa[1024];
+    char scorre[1024];
     char timestamp[1024];
     int i = 1;
     int j = 0;
     int ch = 0;
-    bool timestamped = false;
+    bool timestamped = true;
     bool dev_usred = false;
     int lines;
     time_t rawtime;
@@ -63,33 +72,27 @@ int main(){
     time(&rawtime);
     timeinfo = localtime(&rawtime);
     //sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
-    //timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-    
+    //timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);    
+
     fptr = fopen("srv/diego/pendent/dylan.txt", "r");
     fflush(fptr);
-    lines = count_lines(fptr);
-    fptr = fopen("srv/diego/pendent/dylan.txt", "r");
-    fflush(fptr);
-    while(fscanf(fptr, "%s", buffer)==1){
-        //printf("buffer = %s, j = %d, i = %d, lines = %d.\n", buffer, j, i, lines);
-        if(i==lines && !timestamped){   // Se siamo nell'ultima linea
-            // Estraiamo il timestamp, che è la prima stringa 
-            strcpy(timestamp, buffer);
+    char* stringa = filetobuffer(fptr);
+    while(sscanf(stringa, "%s", scorre)==1){
+        ch = strlen(scorre)+1;
+        stringa += ch;
+        if(timestamped){
+            printf("%s\t", scorre);
+            timestamped = false;
+            continue;
+        }
+        if(!strcmp(scorre, ":")){
+            continue;
+        }
+        if(!strcmp(scorre, "***")){
+            printf("\n");
             timestamped = true;
+        } else{
+            printf("%s ", scorre);
         }
-
-        if(++j == 2 && !dev_usred){
-            strcpy(stringa, buffer);
-            dev_usred = true;
-        }
-
-        if(!strcmp(buffer, "*")){   // Questa è l'ultima stringa della linea quindi passeremo a quella successiva
-            i++;
-        }
-
     }
-    //  fclose(fptr);
-    printf("\nMessaggi ricevuti da %s %d.\n", stringa, lines);
-    printf("Timestamp del piu' recente: %s.\n\n", timestamp);
-
 }

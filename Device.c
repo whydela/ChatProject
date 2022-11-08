@@ -208,6 +208,7 @@ void cleaner(char filename[1024]){
     char buffer[1024];
     char file[1024];
     char file1[1024];
+    bool timestamp = true;
 
     strcpy(file, filename);
     strcpy(file1, filename);
@@ -221,14 +222,21 @@ void cleaner(char filename[1024]){
     fflush(fpptr);
     fflush(fptr);
     while(fscanf(fpptr, "%s", buffer)==1){
-        //printf("Trovo %s\n", buffer);
         fflush(fptr);
+        if(timestamp){
+            fprintf(fptr, "%s \t ", buffer);
+            timestamp = false;
+            continue;
+        }
         if(!strcmp(buffer, "*")){
             fprintf(fptr, "**\n");
+            timestamp = true;
         } else if(!strcmp(buffer, "**")){
             fprintf(fptr, "**\n");
+            timestamp = true;
         } else if(!strcmp(buffer, "***")){
             fprintf(fptr, "***\n");
+            timestamp = true;
         }
         else{
             fprintf(fptr, "%s ", buffer);
@@ -240,6 +248,33 @@ void cleaner(char filename[1024]){
 
     remove(file);
     rename(file1, file);
+}
+
+void readbuffer(char* stringa){
+
+    char scorre[1024];
+    bool timestamp = true;
+    int ch = 0;
+
+    while(sscanf(stringa, "%s", scorre)==1){
+        ch = strlen(scorre)+1;
+        stringa += ch;
+        if(timestamp){
+            printf("%s\t", scorre);
+            timestamp = false;
+            continue;
+        }
+        if(!strcmp(scorre, ":")){
+            continue;
+        }
+        if(!strcmp(scorre, "***")){
+            printf("\n");
+            timestamp = true;
+        } else{
+            printf("%s ", scorre);
+        }
+    }
+
 }
 
 void reg_config(int sd){
@@ -318,7 +353,7 @@ bool log_config(int sd){
         if(!strcmp(buffer, NO)){
             printf("\nATTENZIONE! Username non esistente.\n\n");
             printf("- Si prega di inserire un username esistente.\n");
-            printf("- Per creare un account digiti signup.\n\n-> ");
+            printf("- Per creare un account digiti 'signup'.\n\n-> ");
             continue;
         } else{
             // Altrimenti registra l'username e il device lo comunica
@@ -355,7 +390,7 @@ bool log_config(int sd){
         if(!strcmp(buffer, NO)){
             printf("\nATTENZIONE! Password non corretta.\n\n");
             printf("- Si prega di inserire una password corretta.\n");
-            printf("- Altrimenti digiti signup per registrare un account.\n\n-> ");
+            printf("- Altrimenti digiti 'signup' per registrare un account.\n\n-> ");
             continue;
         } else{
             // Altrimenti registra l'username e il device lo comunica
@@ -525,6 +560,7 @@ void chat(int sd, char dev_usr[1024]){
     char coming[1024];
     char buffer[1024];
     char chatt[1024];
+    char buffer1[1024];
     int ret;
     FILE* fptr;
 
@@ -535,22 +571,26 @@ void chat(int sd, char dev_usr[1024]){
     strcat(buffer, dev_usr);
     cleaner(buffer);
     strcat(buffer, ".txt");
-    //printf("Il percorso e' %s\n", buffer);
 
 
     printf("Chat con %s iniziata !\n\n", dev_usr);
+    printf("--->");
+    printf(" Per inviare un messaggio digitare e premere invio\n");
     printf("--->");
     printf(" Per aggiungere un partecipante digitare '\\u'\n");
     printf("--->");
     printf(" Per condividere un file digitare 'share nomefile'\n");
     printf("--->");
     printf(" Per uscire dalla chat digitare '\\q'\n\n");
+
+    //printf("Il percorso e' %s\n", buffer);
+    strcpy(buffer1, buffer);
     fptr = fopen(buffer, "r");
     strcpy(chatt, filetobuffer(fptr));
     printf("%s", chatt);
     fclose(fptr);
-
-    fptr = fopen(buffer, "a");
+    //printf("Il percorso e' %s\n", buffer1);
+    fptr = fopen(buffer1, "a");
     fflush(fptr);
 
     while(1){
@@ -585,6 +625,7 @@ void chat(int sd, char dev_usr[1024]){
                     } else{
                         strcat(sent, " *");
                     }
+
                     printf("%s\n", sent);
                     fflush(fptr);   
                     fprintf(fptr, "%s\n", sent);
@@ -602,7 +643,7 @@ void chat(int sd, char dev_usr[1024]){
                         if(!strcmp(coming, EXIT)){
                             printf("ATTENZIONE ! %s e' uscito dalla chat.\n\n", dev_usr);
                             online = false;
-                            close(i);
+                            //close(i);
                             offline_chat(srv_sd, dev_usr, fptr);
                             return;
                         } else{
@@ -693,11 +734,22 @@ void chat_config(int sd){
         if(!strcmp(buffer, OFFLINE)){
 
             printf("Username offline, il messaggio verra' comunque inviato:\n\n-> ");
+            strcpy(buffer, msg());
+            strcat(buffer, " *");
+            send_srv(sd, buffer);
+            strcpy(percorso, username);
+            strcat(percorso, "/chat/");
+            strcat(percorso, dev_usr);
+            //strcpy(filename, percorso);
+            strcat(percorso, ".txt");
 
-            send_srv(sd, msg(false));
-            // Il NO indica che e' la prima volta che questo utente vuole parlare con lui
-            // send_srv(sd, NO);
+            fptr = fopen(percorso, "a");
+            fflush(fptr);
+            fprintf(fptr, "%s\n", buffer);
+            fflush(fptr);
+            fclose(fptr);
             return;
+
         }
 
         // A questo punto il Server ci ha confermato che il device contattato e' online
@@ -716,6 +768,41 @@ void chat_config(int sd){
         break;
     }
 
+    // Prima di iniziare la chat devo vedere se ci sono messsaggi pendenti
+    // Senno' non torna la cronologia dei messaggi
+
+    send_srv(sd, CMD_SHOW);
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(!strcmp(buffer, RFD)){
+            send_srv(sd, username);
+            break;
+        }
+    }
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(!strcmp(buffer, RFD)){
+            send_srv(sd, dev_usr);
+            break;
+        }
+    }
+
+    recv(sd, buffer, sizeof(buffer), 0);
+
+    strcpy(percorso, username);
+    strcat(percorso, "/chat/");
+    strcat(percorso, dev_usr);
+    //strcpy(filename, percorso);
+    strcat(percorso, ".txt");
+
+    fptr = fopen(percorso, "a");
+    fflush(fptr);
+    fprintf(fptr, "%s", buffer);
+    fflush(fptr);
+    fclose(fptr);
+
     dev_sd = dev_connect(&dev_addr, dev_port);
 
     // Provo a connettermi al dispositivo
@@ -727,7 +814,7 @@ void chat_config(int sd){
         return;
         // dev_online = false;
     }
-
+    //printf("\nInvio comando\n");
     send_dev(dev_sd, CMD_CHAT);
 
     while(1){
@@ -840,6 +927,9 @@ void show_config(int sd){
 
     char buffer[1024];
     char dev_usr[1024];
+    char percorso[1024];
+    //char filename[1024];
+    FILE* fptr;
 
     send_srv(sd, CMD_SHOW);
 
@@ -868,9 +958,19 @@ void show_config(int sd){
         return;
     }
 
-    printf("%s", buffer);
+    readbuffer(buffer);
 
+    strcpy(percorso, username);
+    strcat(percorso, "/chat/");
+    strcat(percorso, dev_usr);
+    //strcpy(filename, percorso);
+    strcat(percorso, ".txt");
 
+    fptr = fopen(percorso, "a");
+    fflush(fptr);
+    fprintf(fptr, "%s", buffer);
+    fflush(fptr);
+    fclose(fptr);
 
 }
 
@@ -880,6 +980,7 @@ void handler(int sig){
 
     if(chatting){
         send_dev(dev_sd, EXIT);
+        printf("Il Device sta terminando ...\n");
     }
 
     if(online){
@@ -887,6 +988,10 @@ void handler(int sig){
         printf("\n");
         exit(0);
     }
+}
+
+void handler1(int sig){
+    exit(-1);
 }
 
 
@@ -951,6 +1056,7 @@ int main(int argc, char* argv[]){
 
     // Prima stampa
     first_print();
+    signal(SIGTSTP, handler1);   // CTRL+Z o chiusura terminale
 
     //printf("\nDevice connesso al server\n");  
 
@@ -981,8 +1087,8 @@ int main(int argc, char* argv[]){
         }
         else{
             printf("\nATTENZIONE ! Comando -%s- non riconosciuto.\n", spacenter);
-            printf("\n--> Digiti SIGNUP per creare un account.\n\n");
-            printf("--> Se ha gia' un account registrato digiti LOGIN.\n\n-> ");
+            printf("\n--> Digiti 'signup' per creare un account.\n\n");
+            printf("--> Se ha gia' un account registrato digiti 'login'.\n\n-> ");
             continue;
         }
     }
@@ -995,7 +1101,6 @@ int main(int argc, char* argv[]){
 
     // Handler per la gestione della disconnessione del device improvvisa
     signal(SIGINT, handler);    // CTRL+C
-    signal(SIGSTOP, handler);   // CTRL+Z o chiusura terminale
 
     printf("Salve %s ! Benvenuto nel sistema di chatting.\n", username);
 
@@ -1006,14 +1111,14 @@ int main(int argc, char* argv[]){
     rmdir(pendent);
     //mkdir(pendent, 0700);
 
+    // Il Device si e' loggato, bisogna creare il menu' di comparsa
+    second_print();
 
     while(1){
 
         strcpy(percorso, username);
         //strcat(percorso, "/");
         read_fds = master;
-        // Il Device si e' loggato, bisogna creare il menu' di comparsa
-        second_print();
         fflush(stdout);
 
         select(fdmax + 1, &read_fds, NULL, NULL, NULL);
@@ -1074,7 +1179,7 @@ int main(int argc, char* argv[]){
                         printf("Socket chiuso\n");
                         FD_CLR(i, &master);                 // Lo tolgo dal master 
                         close(i);                           // Lo chiudo
-                        printf("Chiudo il socket %d e lo tolgo dal set\n", i);
+                        break;
 
                     } 
                     else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
@@ -1113,6 +1218,7 @@ int main(int argc, char* argv[]){
                         perror("Errore nella reiceve: ");
                         break;
                     }
+                    second_print();
                     break;
                 } 
                 }
