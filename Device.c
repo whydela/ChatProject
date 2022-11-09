@@ -572,7 +572,7 @@ void share_file(int sd){
         return;
     }
     send_dev(sd, SHARE);
-    printf("Condivisione di %s in corso...\n", filename);
+    printf("Condivisione di %s in corso...\n\nContenuto:\n", filename);
     while(1){
         recv(sd, percorso, sizeof(percorso), 0);
         if(strcmp(percorso, RFD)){
@@ -600,7 +600,7 @@ void share_file(int sd){
         break;
     }
 
-    printf("Condivisione file %s completata !\n", filename);
+    printf("\nCondivisione file %s completata !\n", filename);
  
 }
 
@@ -733,7 +733,7 @@ void chat(int sd, char dev_usr[1024]){
 
     printf("Chat con %s iniziata !\n\n", dev_usr);
     printf("--->");
-    printf(" Per inviare un messaggio digitare e premere invio\n");
+    printf(" Per inviare un messaggio occorre digitare e premere invio.\n");
     printf("--->");
     printf(" Per aggiungere un partecipante digitare '\\u'\n");
     printf("--->");
@@ -753,11 +753,13 @@ void chat(int sd, char dev_usr[1024]){
     fptr = fopen(buffer1, "a");
     fflush(fptr);
 
+    /*printf("-> ");
+    fflush(stdout);*/
+
     while(1){
 
         read_chat = master_chat;
         fflush(stdout);
-
         select(fdmax + 1, &read_chat, NULL, NULL, NULL);
 
         for(i=0; i<=fdmax; i++) {
@@ -804,7 +806,8 @@ void chat(int sd, char dev_usr[1024]){
                     fflush(fptr);   
                     fprintf(fptr, "%s\n", sent);
                     fflush(fptr);
-                        
+                    /*printf("-> ");
+                    fflush(stdout); */
                 }
 
                 else if(i == sd){
@@ -817,15 +820,17 @@ void chat(int sd, char dev_usr[1024]){
                         if(!strcmp(coming, SHARE)){
                             send_dev(sd, RFD);
                             recv(sd, filename, sizeof(filename), 0);
-                            printf("Condivisione di %s in corso...\n", filename);
+                            printf("%s sta condividendo un file !\n", dev_usr);
                             strcpy(percorso, username);
                             strcat(percorso, "/");
                             strcat(percorso, filename);
-                            fpptr = fopen(percorso, "w");
                             send_dev(sd, RFD);
                             recv(sd, buffer, sizeof(buffer), 0);
+                            fpptr = fopen(percorso, "a");
+                            fflush(fpptr);
                             fprintf(fpptr, "%s", buffer);
-                            printf("Contenuto:\n%s\n", buffer);
+                            fflush(fpptr);
+                            printf("Contenuto di %s:\n%s\n", filename, buffer);
                             break;
                         }
                         else if(!strcmp(coming, EXIT)){
@@ -845,6 +850,8 @@ void chat(int sd, char dev_usr[1024]){
                         }
                         fflush(stdout);
                         fflush(stdin);
+                        /*printf("-> ");
+                        fflush(stdout);*/
                     }
 
                 }
@@ -1343,19 +1350,22 @@ int main(int argc, char* argv[]){
 
                     if(!strcmp(buffer, "hanging")){
                         // Gestione comando hanging
-                        printf("Gestione comando %s\n", buffer);
+                        //printf("Gestione comando %s\n", buffer);
                         hanging_config(srv_sd);
+                        second_print();
                     }
 
                     else if(!strcmp(buffer, "show")){
                         // Gestione comando show
                         show_config(srv_sd);
+                        second_print();
                     }
 
                     else if(!strcmp(buffer, "chat")){
                         // Gestione comando chat
-                        printf("Gestione comando %s\n", buffer);
+                        //printf("Gestione comando %s\n", buffer);
                         chat_config(srv_sd);
+                        second_print();
                     }
 
                     else if(!strcmp(buffer, "out")){
@@ -1387,7 +1397,7 @@ int main(int argc, char* argv[]){
                     ret = recv(i, command, sizeof(command), 0);   
 
                     if(!ret){                               // Socket i e' stato chiuso, Device offline
-                        printf("Socket chiuso\n");
+                        //printf("Socket chiuso\n");
                         FD_CLR(i, &master);                 // Lo tolgo dal master 
                         close(i);                           // Lo chiudo
                         break;
@@ -1424,7 +1434,7 @@ int main(int argc, char* argv[]){
                             //printf("Gestione CHAT\n");
                             //printf("Hai un nuovo messaggio !\n");
                             chat(i, buffer);
-
+                            second_print();
                         }
                     } 
                     else{
@@ -1437,10 +1447,10 @@ int main(int argc, char* argv[]){
             } 
         }
 
-    second_print();
+    //second_print();
     }
 
-    sleep(60);
+    //sleep(60);
 
     return 0;
 

@@ -10,6 +10,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <dirent.h>
 
 #define STDIN 0
@@ -33,23 +34,23 @@ char messaggio[1024];
 
 
 void first_print(){
-    int i;
-    printf("\n");
-    for(i=0; i < 190; i++){
+    //int i;
+    //printf("\n");
+    /*for(i=0; i < 190; i++){
         printf("*");
     }
     printf("\n");
     for (i=0; i < 11; i++){
         printf("\t");
-    }
-    printf("SERVER AVVIATO\n");
-    for(i=0; i < 190; i++){
+    }*/
+    /*for(i=0; i < 190; i++){
         printf("*");
-    }
-    printf("\n\n\nSi prega di inserire un comando:\n");
+    }*/
+    printf("\n\n-> Si prega di inserire un comando:\n");
     printf("\n- list: Mostra gli utenti online.\n");
     printf("- esc:  Chiude il server.\n");
-    printf("\n(Digitare help per i dettagli dei comandi)\n\n");
+    printf("\n(Digitare 'help' per i dettagli dei comandi)\n\n-> ");
+    fflush(stdout);
     
 
 }
@@ -96,13 +97,13 @@ int dev_config(struct sockaddr_in* dev_addr, int dev_port){
 
 bool check_word(FILE* ptr, char stringa[1024]){
 
-    printf("Checkiamo la parola %s\n", stringa);
+    //printf("Checkiamo la parola %s\n", stringa);
 
     char buffer[1024];
 
     while(fscanf(ptr, "%s", buffer)==1){
-        printf("Trovo %s\n", buffer);
-        if(strstr(buffer, stringa)){
+        //printf("Trovo %s\n", buffer);
+        if(!strcmp(buffer, stringa)){
             return true;
         }
     }
@@ -238,7 +239,7 @@ void send_dv(int sd, char* cmd){
         exit(1);
     }
     
-    printf("Segnale %sinviato\n", cmd);
+    //printf("Segnale %sinviato\n", cmd);
     
 }
 
@@ -286,7 +287,7 @@ void dev_reg(int sd){
         // Ricevo username
         recv(sd, username, sizeof(username), 0);
 
-        printf("Ricevuto %s\n",username);
+        //printf("Ricevuto %s\n",username);
         // creo/apro un file contenente tutti gli username registrati
         
 
@@ -329,7 +330,7 @@ void dev_reg(int sd){
 
         // Adesso gestiamo la password
         recv(sd, password, sizeof(password), 0);
-        printf("Ricevuto %s\n",password);
+        //printf("Ricevuto %s\n",password);
 
         // Apro/creo un file contenente tutti gli username registrati con la password affiancata
         fptr = fopen("srv/usr_psw.txt", "a+");
@@ -357,11 +358,11 @@ bool dev_log(int sd){
     FILE* fptr;
     
     while(1){
-        printf("Gestione username\n");
+        //printf("Gestione username\n");
         // Ricevo username
         recv(sd, username, sizeof(username), 0);
 
-        printf("Ricevuto %s\n",username);
+        //printf("Ricevuto %s\n",username);
 
         if(!strcmp(username, "signup")){
             printf("Si vuole registrare\n");    
@@ -404,12 +405,12 @@ bool dev_log(int sd){
     // Adesso gestiamo la password
     while(1){
 
-            printf("Gestione password\n");
+            //printf("Gestione password\n");
             recv(sd, password, sizeof(password), 0);
-            printf("Ricevuto %s\n", password);
+            //printf("Ricevuto %s\n", password);
 
             if(!strcmp(password, "signup")){
-                printf("Si vuole registrare\n");    
+                //printf("Si vuole registrare\n");    
                 return true;
             }
 
@@ -437,7 +438,7 @@ bool dev_log(int sd){
 
     }
 
-    printf("%s loggato nel sistema\n", username);
+    //printf("%s loggato nel sistema\n", username);
 
     return false;
 
@@ -456,7 +457,7 @@ void dev_online(int sd){
     // Ricevo username
     send_dv(sd, RFD);
     recv(sd, username, sizeof(username), 0);
-    printf("Ricevuto %s\n", username);
+    //printf("Ricevuto %s\n", username);
 
     time(&rawtime);
 
@@ -491,7 +492,7 @@ void dev_online(int sd){
         fflush(fpptr);
         fflush(fppptr);
         while(fscanf(fppptr, "%s", buffer)==1){
-            printf("%s\n", buffer);
+            //printf("%s\n", buffer);
             if(!strcmp(buffer, username)){
                 fprintf(fpptr, "%s\n", username);
                 fscanf(fppptr, "%s", buffer);
@@ -517,7 +518,7 @@ void dev_online(int sd){
         fclose(fptr);
     }
 
-    printf("Ricevuto %s\n", timestamp);
+    //printf("Ricevuto %s\n", timestamp);
 
 
     memset(buffer, 0, sizeof(buffer));
@@ -570,7 +571,7 @@ void crea_lista(int sd, char username[1024]){
             continue;
         }
 
-        printf("Vedo %s\n", scorre);
+        //printf("Vedo %s\n", scorre);
         fflush(fptr);
 
         // Se e' online
@@ -664,14 +665,14 @@ void dev_chat_offline(int sd){
     strcat(percorso, username);
     strcat(percorso, ".txt");
     // Creiamo il file srv/dev_usr/pendent/username.txt
-    printf("Il percorso e' %s\n", percorso);
+    //printf("Il percorso e' %s\n", percorso);
 
     while(1){
         recv(sd, buffer, sizeof(buffer), 0);
         if(!strcmp(buffer, EXIT)){
             return;
         }
-        printf("%s\n", buffer);
+        //printf("%s\n", buffer);
         // Si invia il messaggio in una directory contenente i messaggi pendenti
         // percorso -> srv/dev_usr
         fpptr = fopen(percorso, "a");
@@ -717,7 +718,7 @@ void dev_chat(int sd){
         fclose(fptr);
 
         if(unreachable(sd, dev_usr)){
-            printf("ESCO\n");
+            //printf("ESCO\n");
             return;
         }
 
@@ -750,16 +751,17 @@ void dev_chat(int sd){
 char* hang_msg(char percorso[1024]){
 
     char buffer[1024];
-    char stringa[1024];
+    char dev_usr[1024];
     char timestamp[1024];
     int lines;
+    char ch;
     FILE* fptr;
     int i = 1;  // current line
     int j = 0;  // current word
     bool timestamped = false;
     bool dev_usred;
 
-    printf("%s\n", percorso);
+    //printf("%s\n", percorso);
 
     fptr = fopen(percorso, "r");
     fflush(fptr);
@@ -767,7 +769,6 @@ char* hang_msg(char percorso[1024]){
     fclose(fptr);
     fptr = fopen(percorso, "r");
     fflush(fptr);
-
     while(fscanf(fptr, "%s", buffer)==1){
         //printf("buffer = %s, j = %d, i = %d, lines = %d.\n", buffer, j, i, lines);
         if(i==lines && !timestamped){   // Se siamo nell'ultima linea
@@ -777,19 +778,19 @@ char* hang_msg(char percorso[1024]){
         }
 
         if(++j == 2 && !dev_usred){
-            strcpy(stringa, buffer);
+            strcpy(dev_usr, buffer);
             dev_usred = true;
         }
 
-        if(!strcmp(buffer, "*")){   // Questa è l'ultima stringa della linea quindi passeremo a quella successiva
+        ch = fgetc(fptr);
+        if(ch == '\n'){         // Se si va a capo si incrementa la linea
             i++;
         }
-
     }
 
     memset(messaggio, 0, sizeof(messaggio));
 
-    sprintf(messaggio, "\nMessaggi ricevuti da %s %d.\n", stringa, lines);
+    sprintf(messaggio, "\nMessaggi ricevuti da %s %d.\n", dev_usr, lines);
     sprintf(buffer, "Timestamp del piu' recente: %s.\n", timestamp);
     strcat(messaggio, buffer);
 
@@ -840,7 +841,7 @@ void dev_hanging(int sd){
         
         if(!fpptr){
             if(!i){
-                printf("true\n");
+                //printf("true\n");
                 empty = true;
             }
             continue;
@@ -894,7 +895,7 @@ void dev_show(int sd){
     strcat(percorso, dev_usr);
     strcat(percorso, ".txt");
 
-    printf("Il percorso e' %s\n", percorso);
+    //printf("Il percorso e' %s\n", percorso);
 
     fptr = fopen(percorso, "r");
     if(!fptr){
@@ -927,7 +928,7 @@ void dev_out(int sd){
     send_dv(sd, RFD);
     recv(sd, timestamp, sizeof(timestamp), 0);
 
-    printf("%s sta andando OFFLINE !\n", username);
+    //printf("%s sta andando OFFLINE !\n", username);
 
     // Tolgo dalla lista degli utenti online l'utente selezionato
     fptr = fopen("srv/usr_online1.txt", "a");
@@ -941,7 +942,7 @@ void dev_out(int sd){
         if(!strcmp(buffer, username) || !strcmp(buffer, usr_port) || !strcmp(buffer, timestamp)){
             continue;
         }
-        printf("%s\n", buffer);
+        //printf("%s\n", buffer);
         fprintf(fptr, "%s\n", buffer);
     }
 
@@ -963,16 +964,20 @@ void srv_list(){
 
     char buffer[1024];
     char stringa[1024];
+    char ch;
 
     FILE* fptr = fopen("srv/usr_online.txt", "r");
 
-    if(!fptr){
-        printf("Nessun utente e' attualmente online\n");
+    ch = fgetc(fptr);
+    if(ch == -1){
+        printf("\n---> ATTENZIONE ! Nessun utente e' attualmente online.");
+        fflush(stdout);
         return;
     }
 
     printf("\nLista degli utenti online:\n\n");
-    
+
+    printf("%c", ch);
     while(fscanf(fptr, "%s", buffer)==1){
         int i = 0;
         strcat(buffer, "*");
@@ -984,7 +989,7 @@ void srv_list(){
             }
             i++;
         }
-        printf("%s\n", buffer);
+        printf("%s", buffer);
     }
 
     fclose(fptr);
@@ -1004,8 +1009,16 @@ void srv_help(){
     printf("\n--> Il comando 'esc' permette di terminare il Server.\n\n");
     printf("\t- La disconnessione del Server non implica un'interruzione di");
     printf(" servizio per i Device che stanno comunicando tra loro.\n");
-    printf("\t- Un Device non puo' loggarsi con il Server spento.\n\n");
+    printf("\t- Un Device non puo' loggarsi con il Server spento.\n");
     
+}
+
+void handler(int sig){
+
+    FILE* fptr = fopen("srv/usr_online.txt", "w+");
+    fclose(fptr);
+    exit(0);
+
 }
 
 int main(int argc, char *argv[]) {
@@ -1024,6 +1037,19 @@ int main(int argc, char *argv[]) {
     char buffer[1024];
     int i;
     int addrlen;
+
+    printf("\n");
+    for(i=0; i < 190; i++){
+        printf("*");
+    }
+    printf("\n");
+    for (i=0; i < 11; i++){
+        printf("\t");
+    }
+    printf("SERVER AVVIATO\n");
+    for(i=0; i < 190; i++){
+        printf("*");
+    }
 
     // Questa funzione si occupa della prima stampa a video
     first_print();
@@ -1060,11 +1086,14 @@ int main(int argc, char *argv[]) {
     // Il socket maggiore sara' il listener
     fdmax = listener;
 
+    // Handler per la gestione della disconnessione del device improvvisa
+    signal(SIGINT, handler);    // CTRL+C
+
     // Ciclo principale
     while(1){
 
         read_fds = master;
-        printf("Parte il ciclo e chiamo la select\n\n");
+        //printf("Parte il ciclo e chiamo la select\n\n");
         
         select(fdmax + 1, &read_fds, NULL, NULL, NULL);
 
@@ -1077,6 +1106,7 @@ int main(int argc, char *argv[]) {
                     if(!strcmp(buffer, "list")){
                         // Gestione comando list
                         srv_list();
+                        first_print();
                     }
 
                     else if(!strcmp(buffer, "esc")){
@@ -1089,14 +1119,12 @@ int main(int argc, char *argv[]) {
                     else if(!strcmp(buffer, "help")){
                         // Gestione comando help
                         srv_help();
+                        first_print();
                     }
 
                     else{
-                        printf("\nATTENZIONE ! Comando -%s- inesistente.\n", buffer);
-                        printf("\nSi prega di inserire un comando:\n");
-                        printf("\n- list: Mostra gli utenti online.\n");
-                        printf("- esc:  Chiude il server.\n");
-                        printf("\n(Digitare help per i dettagli dei comandi)\n\n");
+                        printf("\nATTENZIONE ! Comando -%s- inesistente.", buffer);
+                        first_print();
                     }
                 }
 
@@ -1106,7 +1134,7 @@ int main(int argc, char *argv[]) {
 
                     newfd = accept(listener, (struct sockaddr *)&cl_addr, (socklen_t*)&addrlen);
 
-                    printf("Ho accettato la connessione sul listener, aggiungo nuovo socket al SET\n");
+                    //printf("Ho accettato la connessione sul listener, aggiungo nuovo socket al SET\n");
 
                     FD_SET(newfd, &master);                     // Aggiungo il nuovo socket al master
                     fdmax = (newfd > fdmax) ? newfd : fdmax;    // Aggiorno fdmax
@@ -1118,32 +1146,32 @@ int main(int argc, char *argv[]) {
                     ret = recv(i, command, sizeof(command), 0);   
 
                     if(!ret){                               // Socket i e' stato chiuso, Device offline
-                        printf("Socket chiuso\n");
+                        //printf("Socket chiuso\n");
                         FD_CLR(i, &master);                 // Lo tolgo dal master 
                         close(i);                           // Lo chiudo
                     } 
                     else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
 
                         //printf("Il comunicatore (socket %d) e' pronto\n", i);
-                        printf("E' arrivato il comando %s\n", command);
+                        //printf("E' arrivato il comando %s\n", command);
 
                         // Gestione registrazione
                         if(!strcmp(command,CMD_REG)){
                             // La funzione si occupa della corretta registrazione del device
                             // Prende in ingresso il socket descriptor
-                            printf("Gestione registrazione\n");
+                            //printf("Gestione registrazione\n");
                             dev_reg(i);
                         }
 
                         // Gestione login
                         else if(!strcmp(command, CMD_PORT)){
-                            printf("Gestione port\n");
+                            //printf("Gestione port\n");
                             dev_port(i);
                         }
 
                         // Gestione login
                         else if(!strcmp(command, CMD_LOG)){
-                            printf("Gestione login \n");
+                            //printf("Gestione login \n");
                             // La funzione si occupa del login del device
                             // Prende in ingresso il socket descriptor
                             if(dev_log(i)){
@@ -1153,36 +1181,36 @@ int main(int argc, char *argv[]) {
 
                         // Gestione timestamp
                         else if(!strcmp(command, CMD_TMS)){
-                            printf("Gestione timestamp\n");
+                            //printf("Gestione timestamp\n");
                             dev_online(i);
                         }
 
                         // Gestione chat
                         else if(!strcmp(command, CMD_CHAT)){
-                            printf("Gestione chat\n");
+                            //printf("Gestione chat\n");
                             dev_chat(i);
                         }
 
                         else if(!strcmp(command, CMD_HANGING)){
-                            printf("Gestione hanging\n");
+                            //printf("Gestione hanging\n");
                             dev_hanging(i);
                         }
 
                         else if(!strcmp(command, CMD_SHOW)){
-                            printf("Gestione show\n");
+                            //printf("Gestione show\n");
                             dev_show(i);
                         }
 
                         else if(!strcmp(command, CMD_OFF)){
-                            printf("Gestione out\n");
+                            //printf("Gestione out\n");
                             dev_out(i);
-                            printf("Socket chiuso\n");
+                            //printf("Socket chiuso\n");
                             FD_CLR(i, &master);                 // Lo tolgo dal master 
                             close(i);                           // Lo chiudo
                         }
 
                         else if(!strcmp(command, CMD_CHATOFF)){
-                            printf("Gestione chat offline\n");
+                            //printf("Gestione chat offline\n");
                             dev_chat_offline(i);
                         }
 
