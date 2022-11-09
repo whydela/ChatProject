@@ -20,6 +20,7 @@
 #define CMD_LOG "/LOGIN\0"
 #define CMD_OFF "/OFF\0"
 #define CMD_TMS "/TIMESTAMP\0"
+#define CMD_PORT "/PORT\0"
 #define CMD_REG "/REG\0"
 #define CMD_SHOW "/SHOW\0"
 #define YES "/YES\0"
@@ -112,8 +113,14 @@ bool check_word(FILE* ptr, char stringa[1024]){
 char* filetobuffer(FILE* fptr){
 
     char scorre[1024];
-    bool timestamp = true;
-    memset(buffer, 0, sizeof(*buffer));         // Pulizia della variabile globale
+    //bool timestamp = true;
+    memset(buffer, 0, sizeof(buffer));         // Pulizia della variabile globale
+
+    while (fgets(scorre, 1024, fptr) != NULL) {
+        strcat(buffer, scorre);
+        fflush(fptr);
+    }
+    /*
     while(fscanf(fptr, "%s", scorre)==1){
         if(timestamp){
             strcat(scorre, "\t");
@@ -129,7 +136,7 @@ char* filetobuffer(FILE* fptr){
         }
         strcat(buffer, scorre);
     }
-
+    */
     return buffer;
 
 }
@@ -231,8 +238,41 @@ void send_dv(int sd, char* cmd){
         exit(1);
     }
     
-    printf("Segnale %s inviato\n", cmd);
+    printf("Segnale %sinviato\n", cmd);
     
+}
+
+void dev_port(int sd){
+
+    char username[1024];
+    char port[1024];
+    char scorre[1024];
+
+    FILE* fptr = fopen("srv/usr_log.txt", "r");
+
+    send_dv(sd, RFD);
+    recv(sd, username, sizeof(username), 0);
+
+    send_dv(sd, RFD);
+    recv(sd, port, sizeof(port), 0);
+
+    while(fscanf(fptr, "%s", scorre)==1){
+        if(!strcmp(scorre, username)){
+            fscanf(fptr, "%s", scorre);
+            if(!strcmp(scorre, port)){
+                break;
+            }
+            else{
+                send_dv(sd, scorre);
+            }
+        }
+        if(!strcmp(scorre, port)){
+            send_dv(sd, NO);
+        }
+    }
+
+    send_dv(sd, YES);
+
 }
 
 void dev_reg(int sd){
@@ -729,7 +769,7 @@ char* hang_msg(char percorso[1024]){
     fflush(fptr);
 
     while(fscanf(fptr, "%s", buffer)==1){
-        printf("buffer = %s, j = %d, i = %d, lines = %d.\n", buffer, j, i, lines);
+        //printf("buffer = %s, j = %d, i = %d, lines = %d.\n", buffer, j, i, lines);
         if(i==lines && !timestamped){   // Se siamo nell'ultima linea
             // Estraiamo il timestamp, che è la prima stringa 
             strcpy(timestamp, buffer);
@@ -767,6 +807,8 @@ void dev_hanging(int sd){
     char filename[1024];
     char buffer[1024];
     char msg[1024];
+    int i = 0;
+    bool empty = false;
     FILE* fptr, *fpptr;
     memset(msg, 0, sizeof(msg));
     memset(buffer, 0, sizeof(buffer));
@@ -794,9 +836,13 @@ void dev_hanging(int sd){
 
         //printf("%s\n", buffer);
 
-        fpptr = fopen(buffer, "r");
+        fpptr = fopen(buffer, "r"); 
         
         if(!fpptr){
+            if(!i){
+                printf("true\n");
+                empty = true;
+            }
             continue;
         }
 
@@ -804,9 +850,12 @@ void dev_hanging(int sd){
 
         // Questa funzione prepara il messaggio da inviare al Device
         strcat(msg, hang_msg(buffer));
-        
+        empty = false;     
+        i++;   
     }
-
+    if(empty){
+        strcpy(msg, "\nNessun messaggio pendente !\n");
+    }
     send_dv(sd, msg);
 
 }
@@ -845,14 +894,18 @@ void dev_show(int sd){
     strcat(percorso, dev_usr);
     strcat(percorso, ".txt");
 
-    //printf("Il percorso e' %s\n", percorso);
+    printf("Il percorso e' %s\n", percorso);
 
     fptr = fopen(percorso, "r");
+    if(!fptr){
+        send_dv(sd, " ");
+        return;
+    }
+    
     fflush(fptr);
-    strcpy(msg, filetobuffer(fptr));    
+    strcpy(msg, filetobuffer(fptr));
     send_dv(sd, msg);
-    fptr = fopen(percorso, "w+");
-    fflush(fptr);
+    remove(percorso);
 
 }
 
@@ -1068,8 +1121,6 @@ int main(int argc, char *argv[]) {
                         printf("Socket chiuso\n");
                         FD_CLR(i, &master);                 // Lo tolgo dal master 
                         close(i);                           // Lo chiudo
-                        printf("Chiudo il socket %d e lo tolgo dal set\n", i);
-
                     } 
                     else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
 
@@ -1082,6 +1133,12 @@ int main(int argc, char *argv[]) {
                             // Prende in ingresso il socket descriptor
                             printf("Gestione registrazione\n");
                             dev_reg(i);
+                        }
+
+                        // Gestione login
+                        else if(!strcmp(command, CMD_PORT)){
+                            printf("Gestione port\n");
+                            dev_port(i);
                         }
 
                         // Gestione login
@@ -1119,6 +1176,9 @@ int main(int argc, char *argv[]) {
                         else if(!strcmp(command, CMD_OFF)){
                             printf("Gestione out\n");
                             dev_out(i);
+                            printf("Socket chiuso\n");
+                            FD_CLR(i, &master);                 // Lo tolgo dal master 
+                            close(i);                           // Lo chiudo
                         }
 
                         else if(!strcmp(command, CMD_CHATOFF)){

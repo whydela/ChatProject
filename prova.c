@@ -57,13 +57,13 @@ char* filetobuffer(FILE* fptr){
 
 int main(){
 
-    FILE* fp, *fptr;
+    FILE* fpptr, *fptr;
     char carattere;
     char scorre[1024];
     char timestamp[1024];
     int i = 1;
     int j = 0;
-    int ch = 0;
+    //int ch = 0;
     bool timestamped = true;
     bool dev_usred = false;
     int lines;
@@ -74,25 +74,30 @@ int main(){
     //sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
     //timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);    
 
-    fptr = fopen("srv/diego/pendent/dylan.txt", "r");
-    fflush(fptr);
-    char* stringa = filetobuffer(fptr);
-    while(sscanf(stringa, "%s", scorre)==1){
-        ch = strlen(scorre)+1;
-        stringa += ch;
-        if(timestamped){
-            printf("%s\t", scorre);
-            timestamped = false;
-            continue;
-        }
-        if(!strcmp(scorre, ":")){
-            continue;
-        }
-        if(!strcmp(scorre, "***")){
-            printf("\n");
-            timestamped = true;
-        } else{
-            printf("%s ", scorre);
-        }
+ 
+    // Opening file in reading mode
+ 
+    // Printing what is written in file
+    // character by character using loop.
+    fpptr = fopen("lore/chat/diego.txt", "r");
+    //fptr = fopen("lore/chat/diego1.txt", "a");
+
+    fflush(fpptr);
+    //fflush(fptr);
+    while (fgets(buffer, 1024, fpptr) != NULL) {
+        printf("%d:%s", j, buffer);
+        //fprintf(fptr, "%s", buffer);
+        //fflush(fptr);
+        fflush(fpptr);
+        j++;
     }
+
+    fclose(fpptr);
+   // fclose(fptr);
+
+    //remove("lore/chat/diego.txt");
+    //rename("lore/chat/diego1.txt", "lore/chat/diego.txt");
+
+    return 0;
+ 
 }
