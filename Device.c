@@ -13,23 +13,25 @@
 #include <sys/wait.h>
 #include <dirent.h>
 
-#define RFD "RFD\0"
-#define CMD_REG "/REG\0"
-#define CMD_LOG "/LOGIN\0"
-#define CMD_TMS "/TIMESTAMP\0"
-#define CMD_CHAT "/CHAT\0"
-#define CMD_OFF "/OFF\0"
 #define CMD_CHATOFF "/CHATOFF\0"
+#define CMD_CHAT "/CHAT\0"
 #define CMD_HANGING "/HANGING\0"
+#define CMD_LOG "/LOGIN\0"
+#define CMD_OFF "/OFF\0"
 #define CMD_PORT "/PORT\0"
+#define CMD_REG "/REG\0"
+#define CMD_RUBRIC "/RUBRIC\0"
 #define CMD_SHOW "/SHOW\0"
+#define CMD_TMS "/TIMESTAMP\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
 #define SHARE "/SHARE\0"
 #define OFFLINE "/OFFLINE\0"
-#define STDIN 0
+#define RFD "RFD\0"
 #define EXIT "\\q\0"
 #define DELETE "\\d\0"
+#define ADD "\\u\0"
+#define STDIN 0
 
 char username[1024];                    // username del device
 char password[1024];                    // password del device
@@ -38,15 +40,15 @@ char percorso[1024];                    // percorso: username/file.txt
 char rubrica[1024];                     // rubrica
 char pendent[1024];
 char messaggio[1024];                   // messaggio della chat
-char all_chat[1024];
+char all_chat[1024];                    // variabile globale per la funzione "filetobuffer"
 
 int my_port;                            // porta del device
-int srv_sd;
-int dev_sd;
-bool online = false;
-bool chatting = false;
+int srv_sd;                             // communication socket descriptor (Server)
+int dev_sd;                             // communication socket descriptor (Device)
+bool online = false;                    // se true, Device online
+bool chatting = false;                  // se true, Device dentro la chat
 
-
+// Questa funzione si occupa della prima stampa riguardo al Device
 void first_print(){
     int i;
     printf("\n");
@@ -63,6 +65,7 @@ void first_print(){
     }    
 }
 
+// Questa funzione controlla se una data 'stringa' in ingresso e' presente nel file puntato da 'ptr'
 bool check_word(FILE* ptr, char stringa[1024]){
 
     //printf("Checkiamo la parola %s\n", stringa);
@@ -79,6 +82,7 @@ bool check_word(FILE* ptr, char stringa[1024]){
     return false;
 }
 
+// Questa funzione si occupa della conversione di un file in buffer 
 char* filetobuffer(FILE* fptr){
 
     char scorre[1024];
@@ -183,7 +187,7 @@ void send_srv(int sd, char* cmd){
     //printf("Invio %s\n", cmd);
     send(sd, cmd, strlen(cmd)+1, 0);
 
-    //printf("Messaggio %s inviato\n", cmd);
+    printf("Messaggio %s inviato\n", cmd);
     
 }
 
@@ -196,6 +200,7 @@ int send_dev(int sd, char* cmd){
     return ret;
 }
 
+/*
 bool ls(char* directory, char* file){
 
     DIR *mydir;
@@ -210,7 +215,7 @@ bool ls(char* directory, char* file){
     closedir(mydir);
     return false;
 }
-
+*/
 /*
 // Cleaner che cambia il singolo asterisco con quello doppio nelle chat
 void cleaner(char filename[1024]){
@@ -336,6 +341,7 @@ void port_config(int sd, int port){
 }
 */
 
+// Questa funzione si occupa della registrazione del device
 void reg_config(int sd){
 
     char buffer[1024];
@@ -382,6 +388,7 @@ void reg_config(int sd){
 
 }
 
+// Questa funzione si occupa del login del device
 bool log_config(int sd){
 
     char buffer[1024];
@@ -460,6 +467,7 @@ bool log_config(int sd){
 
 }
 
+// Questa funzione si occupa della configurazione del device una volta loggato
 void online_config(int sd, int port){
 
     char buffer[1024];
@@ -497,6 +505,7 @@ void online_config(int sd, int port){
 
 }
 
+// Questa funzione si occupa della stampa del menu' a comparsa per i Device
 void second_print(){
     printf("\nSi prega di inserire un comando:\n\n");
     printf("- hanging: per vedere gli utenti che hanno inviato messaggi mentre era offline.\n");
@@ -505,7 +514,32 @@ void second_print(){
     printf("- out: per disconnettersi dal Server.\n\n-> ");
 }
 
-// La funzione sottostante prepara il messaggio da inviare nella chat
+void grpchat_config(int sd, char users[1024]){
+
+    char buffer[1024];
+    char lista[1024];
+
+    send_srv(sd, CMD_RUBRIC);
+
+    while(1){
+        recv(sd, buffer, sizeof(buffer), 0);
+        if(strcmp(buffer, RFD)){
+            continue;
+        }
+        send_srv(sd, users);
+        break;
+    }
+
+    // Ricevo la lista
+    recv(sd, lista, sizeof(lista), 0);
+
+    printf("Si prega di scegliere un utente da aggiungere.\n");
+    printf("Lista utenti online:%s\n", lista);
+
+
+}
+
+// Questa funzione si occupa della preparazione del messaggio da inviare nella chat
 char* msg(){
 
     char timestamp[1024];
@@ -540,6 +574,11 @@ char* msg(){
         return DELETE;
     }
 
+    if(!strcmp(stringa, ADD)){
+        // Facciamo capire al Server che vogliamo la rubrica degli utenti online
+        return ADD;
+    }
+
     if(!strcmp(stringa, "share")){
         strcpy(messaggio, stringa);
         return messaggio;
@@ -554,6 +593,7 @@ char* msg(){
 
 }
 
+// Questa funzione si occupa della condivisione del file da parte di un mittente
 void share_file(int sd){
 
     char filename[1024];
@@ -604,6 +644,7 @@ void share_file(int sd){
  
 }
 
+// Questa funzione aggiunge alla cronologia della chat i messaggi pendenti
 void pendent_before_chat(int sd, char dev_usr[1024]){
     
     char buffer[1024];
@@ -634,7 +675,7 @@ void pendent_before_chat(int sd, char dev_usr[1024]){
 
     recv(sd, buffer, sizeof(buffer), 0);
 
-    if(strcmp(buffer, " ")){
+    if(strcmp(buffer, NO)){
         strcpy(percorso, username);
         strcat(percorso, "/chat/");
         strcat(percorso, dev_usr);
@@ -649,6 +690,7 @@ void pendent_before_chat(int sd, char dev_usr[1024]){
 
 }
 
+// Questa funzione gestisce la chat quando un Device e' uscito e quindi e' andato offline
 void offline_chat(int sd, char dev_usr[1024], FILE* fptr){
 
     char buffer[1024];
@@ -696,7 +738,7 @@ void offline_chat(int sd, char dev_usr[1024], FILE* fptr){
 
 }  
 
-// La funzione sottostante si occupa della chat dei Device
+// Questa funzione si occupa della chat dei Device
 void chat(int sd, char dev_usr[1024]){
 
     fd_set master_chat;
@@ -716,7 +758,7 @@ void chat(int sd, char dev_usr[1024]){
     char sent[1024];
     char coming[1024];
     char buffer[1024];
-    //char chatt[1024];
+    char users[1024];
     char buffer1[1024];
     char filename[1024];
     int ret;
@@ -753,6 +795,11 @@ void chat(int sd, char dev_usr[1024]){
     fptr = fopen(buffer1, "a");
     fflush(fptr);
 
+    strcat(users, username);
+    strcat(users, "\n");
+    strcat(users, dev_usr);
+    strcat(users, "\n");
+
     /*printf("-> ");
     fflush(stdout);*/
 
@@ -786,6 +833,11 @@ void chat(int sd, char dev_usr[1024]){
                         break;                 
                     }
                     
+                    if(!strcmp(sent, ADD)){
+                        grpchat_config(srv_sd, users);
+                        break;
+                    }
+
                     send_dev(sd, sent);
 
                     if(!strcmp(sent, EXIT)){
@@ -861,6 +913,7 @@ void chat(int sd, char dev_usr[1024]){
     }
 }
 
+// Questa funzione si occupa della configurazione pre-chat del Device
 void chat_config(int sd){
 
     FILE* fptr;
@@ -906,7 +959,6 @@ void chat_config(int sd){
         //dev_friend = false;
     }
     fclose(fptr);
-    
 
     while(1){
         printf("Si prega di inserire l'username con cui si vuole aprire una chat\n\n-> ");
@@ -925,7 +977,7 @@ void chat_config(int sd){
             printf("\nATTENZIONE ! Username non presente.\n");
             continue;
         }
-        
+
         if(!strcmp(buffer, OFFLINE)){
 
             printf("Username offline, il messaggio verra' comunque inviato:\n\n-> ");
@@ -1001,7 +1053,7 @@ void chat_config(int sd){
     }
     */
     
-   pendent_before_chat(sd, dev_usr);
+    pendent_before_chat(sd, dev_usr);
 
     dev_sd = dev_connect(&dev_addr, dev_port);
 
@@ -1058,6 +1110,7 @@ void chat_config(int sd){
 
 }
 
+// Questa funzione si occupa del logout del Device
 void out_config(int sd){
 
     char buffer[1024];
@@ -1099,6 +1152,7 @@ void out_config(int sd){
     //rmdir(username);
 }
 
+// Questa funzione si occupa del comando 'hanging' digitato dal Device
 void hanging_config(int sd){
 
     char buffer[1024];
@@ -1123,6 +1177,7 @@ void hanging_config(int sd){
 
 }
 
+// Questa funzione si occupa del comando 'show username' digitato dal Device
 void show_config(int sd){
 
     char buffer[1024];
@@ -1189,6 +1244,7 @@ void show_config(int sd){
 
 }
 
+// Handler per la gestione di segnali di uscita improvvisa come CTRL+C o CTRL+Z
 void handler(int sig){
     
     //printf("Entro nell'handler\n");
@@ -1204,12 +1260,11 @@ void handler(int sig){
         exit(0);
     }
 }
-
 void handler1(int sig){
     exit(-1);
 }
 
-
+// Main
 int main(int argc, char* argv[]){
 
     int ret, srv_port;

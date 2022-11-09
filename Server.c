@@ -23,6 +23,7 @@
 #define CMD_TMS "/TIMESTAMP\0"
 #define CMD_PORT "/PORT\0"
 #define CMD_REG "/REG\0"
+#define CMD_RUBRIC "/RUBRIC\0"
 #define CMD_SHOW "/SHOW\0"
 #define YES "/YES\0"
 #define NO "/NO\0"
@@ -636,6 +637,65 @@ bool unreachable(int sd, char username[1024]){
 
 }
 
+void dev_rubric(int sd){
+
+    char lista[1024];
+    char buffer[1024];
+    char scorre[1024];
+    char stringa[1024];
+    char* users;
+    FILE* fptr;
+    bool find = false;
+    int i = 0;
+    int ch = 0;
+
+    // Ready for data
+    send_dv(sd, RFD);
+
+
+    // Si riceve l'username che vuole aggiungere un utente alla chat
+    recv(sd, buffer, sizeof(buffer), 0);
+    printf("\nRicevo %s", buffer);
+    strcpy(lista, buffer);
+    users = lista;
+
+    memset(lista, 0, sizeof(lista));
+    memset(buffer, 0, sizeof(buffer));
+
+    strcpy(lista, lista);
+
+    fptr = fopen("srv/usr_online.txt", "r");
+
+    while(fgets(scorre, 1024, fptr) != NULL){
+        if(!(i%3)){     // Stiamo visionando un username
+            printf("online_user: %s", scorre);
+            ch = 0;
+            users = lista;
+            while(sscanf(users, "%s", stringa)==1){
+                ch = strlen(stringa)+1;
+                users += ch;
+                strcat(stringa, "\n");
+                printf("chat_user: %s", stringa);
+                if(!strcmp(stringa, scorre)){
+                    printf("%s e' stato trovato\n", scorre);
+                    find = true;
+                    break;
+                }
+            }
+            if(!find){
+                strcat(buffer, "-> ");
+                strcat(buffer, scorre);
+            } 
+            find = false;
+        }
+        i++;
+    }
+
+    printf("Lista degli utenti online:\n%s", buffer);
+    send_dv(sd, buffer);
+
+}
+
 void dev_chat_offline(int sd){
 
     char percorso[1024];
@@ -895,11 +955,11 @@ void dev_show(int sd){
     strcat(percorso, dev_usr);
     strcat(percorso, ".txt");
 
-    //printf("Il percorso e' %s\n", percorso);
+    printf("Il percorso e' %s\n", percorso);
 
     fptr = fopen(percorso, "r");
     if(!fptr){
-        send_dv(sd, " ");
+        send_dv(sd, NO);
         return;
     }
     
@@ -989,7 +1049,7 @@ void srv_list(){
             }
             i++;
         }
-        printf("%s", buffer);
+        printf("%s\n", buffer);
     }
 
     fclose(fptr);
@@ -1189,6 +1249,11 @@ int main(int argc, char *argv[]) {
                         else if(!strcmp(command, CMD_CHAT)){
                             //printf("Gestione chat\n");
                             dev_chat(i);
+                        }
+                        
+                        else if(!strcmp(command, CMD_RUBRIC)){
+                            //printf("Gestione rubric\n");
+                            dev_rubric(i);
                         }
 
                         else if(!strcmp(command, CMD_HANGING)){

@@ -60,15 +60,22 @@ int main(){
     FILE* fpptr, *fptr;
     char carattere;
     char scorre[1024];
+    char* users;
     char timestamp[1024];
-    int i = 1;
+    strcpy(timestamp, "diego\nlore\n");
+    users = timestamp;
+    char lista[1024];
+    char stringa[1024];
+    char buffer[1024];
+    int i = 0;
     int j = 0;
-    //int ch = 0;
+    int ch = 0;
     bool timestamped = true;
     bool dev_usred = false;
     int lines;
     time_t rawtime;
     struct tm * timeinfo;
+    bool find = false;
     time(&rawtime);
     timeinfo = localtime(&rawtime);
     //sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
@@ -79,21 +86,39 @@ int main(){
  
     // Printing what is written in file
     // character by character using loop.
-    fpptr = fopen("lore/chat/diego.txt", "r");
-    //fptr = fopen("lore/chat/diego1.txt", "a");
+    memset(lista, 0, sizeof(lista));
+    memset(buffer, 0, sizeof(*buffer));
 
-    fflush(fpptr);
-    //fflush(fptr);
-    while (fgets(buffer, 1024, fpptr) != NULL) {
-        printf("%d:%s", j, buffer);
-        //fprintf(fptr, "%s", buffer);
-        //fflush(fptr);
-        fflush(fpptr);
-        j++;
+    fptr = fopen("srv/usr_online.txt", "r");
+
+    while(fgets(scorre, 1024, fptr) != NULL){
+        if(!(i%3)){     // Stiamo visionando un username
+            //printf("online_user: %s", scorre);
+            ch = 0;
+            users = timestamp;
+            while(sscanf(users, "%s", stringa)==1){
+                ch = strlen(stringa)+1;
+                users += ch;
+                strcat(stringa, "\n");
+                //printf("chat_user: %s", stringa);
+                if(!strcmp(stringa, scorre)){
+                    //printf("%s e' stato trovato\n", scorre);
+                    find = true;
+                    break;
+                }
+            }
+            if(!find){
+                strcat(buffer, "-> ");
+                strcat(buffer, scorre);
+            } 
+            find = false;
+        }
+        i++;
     }
 
-    fclose(fpptr);
-   // fclose(fptr);
+    printf("Lista degli utenti online:\n%s", buffer);
+
+    // fclose(fptr);
 
     //remove("lore/chat/diego.txt");
     //rename("lore/chat/diego1.txt", "lore/chat/diego.txt");
