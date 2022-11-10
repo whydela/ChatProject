@@ -240,10 +240,11 @@ void send_dv(int sd, char* cmd){
         exit(1);
     }
     
-    //printf("Segnale %sinviato\n", cmd);
+    //printf("Segnale %s inviato\n", cmd);
     
 }
 
+/*
 void dev_port(int sd){
 
     char username[1024];
@@ -276,6 +277,7 @@ void dev_port(int sd){
     send_dv(sd, YES);
 
 }
+*/
 
 void dev_reg(int sd){
 
@@ -655,29 +657,30 @@ void dev_rubric(int sd){
 
     // Si riceve l'username che vuole aggiungere un utente alla chat
     recv(sd, buffer, sizeof(buffer), 0);
-    printf("\nRicevo %s", buffer);
+    //printf("\nRicevo %s", buffer);
     strcpy(lista, buffer);
     users = lista;
 
-    memset(lista, 0, sizeof(lista));
     memset(buffer, 0, sizeof(buffer));
 
-    strcpy(lista, lista);
+    //strcpy(lista, lista);
 
     fptr = fopen("srv/usr_online.txt", "r");
 
     while(fgets(scorre, 1024, fptr) != NULL){
         if(!(i%3)){     // Stiamo visionando un username
-            printf("online_user: %s", scorre);
+            //printf("online_user: %s", scorre);
             ch = 0;
             users = lista;
+            //printf("Users: %s", users);
             while(sscanf(users, "%s", stringa)==1){
+                //printf("Entro\n");
                 ch = strlen(stringa)+1;
                 users += ch;
                 strcat(stringa, "\n");
-                printf("chat_user: %s", stringa);
+                //printf("chat_user: %s", stringa);
                 if(!strcmp(stringa, scorre)){
-                    printf("%s e' stato trovato\n", scorre);
+                    //printf("%s e' stato trovato\n", scorre);
                     find = true;
                     break;
                 }
@@ -691,8 +694,34 @@ void dev_rubric(int sd){
         i++;
     }
 
-    printf("Lista degli utenti online:\n%s", buffer);
-    send_dv(sd, buffer);
+    fclose(fptr);
+
+    //printf("Lista degli utenti online:\n%s", buffer);
+    if(buffer[0] == '-'){
+        send_dv(sd, buffer);
+    } else{
+        send_dv(sd, NO);
+        return;
+    }
+
+    
+    recv(sd, buffer, sizeof(buffer), 0);
+    //printf("Ricevo %s\n", buffer);
+
+    fptr = fopen("srv/usr_log.txt", "r");
+    fflush(fptr);
+
+    while(fscanf(fptr, "%s", stringa)==1){
+        if(!strcmp(buffer, stringa)){
+            fscanf(fptr, "%s", stringa);
+            break;
+        }
+    }
+
+    send_dv(sd, stringa);
+
+    //printf("Invio %s\n", stringa);
+
 
 }
 
@@ -955,7 +984,7 @@ void dev_show(int sd){
     strcat(percorso, dev_usr);
     strcat(percorso, ".txt");
 
-    printf("Il percorso e' %s\n", percorso);
+    //printf("Il percorso e' %s\n", percorso);
 
     fptr = fopen(percorso, "r");
     if(!fptr){
@@ -1226,7 +1255,7 @@ int main(int argc, char *argv[]) {
                         // Gestione login
                         else if(!strcmp(command, CMD_PORT)){
                             //printf("Gestione port\n");
-                            dev_port(i);
+                            //dev_port(i);
                         }
 
                         // Gestione login

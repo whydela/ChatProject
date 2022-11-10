@@ -15,6 +15,7 @@
 
 #define CMD_CHATOFF "/CHATOFF\0"
 #define CMD_CHAT "/CHAT\0"
+#define CMD_GRPCHAT "/GRPCHAT\0"
 #define CMD_HANGING "/HANGING\0"
 #define CMD_LOG "/LOGIN\0"
 #define CMD_OFF "/OFF\0"
@@ -41,12 +42,23 @@ char rubrica[1024];                     // rubrica
 char pendent[1024];
 char messaggio[1024];                   // messaggio della chat
 char all_chat[1024];                    // variabile globale per la funzione "filetobuffer"
+char grp_users[1024];                   // variabile contenente gli username e la loro porta che il
+                                        // Device ha invitato nella chat di gruppo
 
 int my_port;                            // porta del device
 int srv_sd;                             // communication socket descriptor (Server)
 int dev_sd;                             // communication socket descriptor (Device)
 bool online = false;                    // se true, Device online
 bool chatting = false;                  // se true, Device dentro la chat
+
+int num_users;
+
+struct users{
+    char usr[1024];
+    int port;
+};
+
+struct users dev_users[10];
 
 // Questa funzione si occupa della prima stampa riguardo al Device
 void first_print(){
@@ -187,7 +199,7 @@ void send_srv(int sd, char* cmd){
     //printf("Invio %s\n", cmd);
     send(sd, cmd, strlen(cmd)+1, 0);
 
-    printf("Messaggio %s inviato\n", cmd);
+    //printf("Messaggio %s inviato\n", cmd);
     
 }
 
@@ -514,10 +526,15 @@ void second_print(){
     printf("- out: per disconnettersi dal Server.\n\n-> ");
 }
 
-void grpchat_config(int sd, char users[1024]){
+int grpchat_config(int sd, char users[1024]){
 
+    struct sockaddr_in dev_addr;
     char buffer[1024];
     char lista[1024];
+    char dev_usr[1024];
+    int port;
+    int dev_sd;
+    int ret;
 
     send_srv(sd, CMD_RUBRIC);
 
@@ -533,9 +550,78 @@ void grpchat_config(int sd, char users[1024]){
     // Ricevo la lista
     recv(sd, lista, sizeof(lista), 0);
 
-    printf("Si prega di scegliere un utente da aggiungere.\n");
-    printf("Lista utenti online:%s\n", lista);
+    if(!strcmp(lista, NO)){
+        printf("\nATTENZIONE ! Nessun utente e' attualmente online.\n\n");
+        return 0;
+    }
 
+    printf("\nSi prega di scegliere un utente da aggiungere.\n");
+    printf("\nLista utenti online:\n\n%s\n", lista);
+
+    // Diciamo al Server che username vogliamo aggiungere
+    scanf("%s", dev_usr);
+
+    send_srv(sd, dev_usr);
+
+    recv(sd, buffer, sizeof(buffer), 0);
+
+    port = atoi(buffer);
+
+    dev_sd = dev_connect(&dev_addr, port);
+
+    // Provo a connettermi al dispositivo
+    ret = connect(dev_sd, (struct sockaddr*)&dev_addr, sizeof(dev_addr));
+
+    if(ret < 0){
+        // Dispositivo offline
+        printf("\nATTENZIONE ! Il dispositivo non e' attualmente raggiungibile.\n\n");
+        return 0;
+    }
+
+    //printf("\nInvio comando\n");
+    send_dev(dev_sd, CMD_GRPCHAT);
+
+    while(1){
+        recv(dev_sd, buffer, sizeof(buffer), 0);
+        if(strcmp(buffer, RFD)){
+            continue;
+        }
+        send_dev(dev_sd, username);
+        break;
+    }
+
+    sprintf(grp_users, "%s %d", dev_usr, port);
+    //printf("%s", grp_users);
+
+    printf("In attesa che %s accetti la chat...\n", dev_usr);
+
+    while(1){
+
+        recv(dev_sd, buffer, sizeof(buffer), 0);
+
+        if(!strcmp(buffer, RFD)){
+            printf("%s aggiunto alla chat di gruppo !\n", dev_usr);
+            strcpy(dev_users[num_users].usr, dev_usr);
+            dev_users[num_users].port = port;
+            num_users++;
+            /*printf("num_users: %d\n", num_users);
+            int j;
+            for(j=0; j < num_users; j++){
+                printf("user:%s\nport:%d.\n", dev_users[j].usr, dev_users[j].port);
+            }*/
+            break;
+        }
+
+        else if(!strcmp(buffer, NO)){
+            printf("\nATTENZIONE ! %s ha rifiutato la chat !\n", dev_usr);
+            return 0;
+        }
+    }
+
+    //send_dev(dev_sd, grp_users);
+
+
+    return dev_sd;
 
 }
 
@@ -745,6 +831,18 @@ void chat(int sd, char dev_usr[1024]){
     fd_set read_chat;
     int fdmax;
     int i;
+    int j;
+    char sent[1024];
+    char coming[1024];
+    char buffer[1024];
+   
+    char filename[1024];
+    char users[1024];
+    char buffer1[1024]; 
+    int sockets[100];
+    int ret;
+    int new_sd;
+    int num_sd = 1;
     bool online = true;
     chatting = true;
     dev_sd = sd; 
@@ -755,13 +853,8 @@ void chat(int sd, char dev_usr[1024]){
     FD_SET(sd, &master_chat);
 
     fdmax = sd;
-    char sent[1024];
-    char coming[1024];
-    char buffer[1024];
-    char users[1024];
-    char buffer1[1024];
-    char filename[1024];
-    int ret;
+    sockets[0] = sd;
+
     FILE* fptr, *fpptr;
 
     strcpy(buffer, username);
@@ -804,7 +897,6 @@ void chat(int sd, char dev_usr[1024]){
     fflush(stdout);*/
 
     while(1){
-
         read_chat = master_chat;
         fflush(stdout);
         select(fdmax + 1, &read_chat, NULL, NULL, NULL);
@@ -834,11 +926,20 @@ void chat(int sd, char dev_usr[1024]){
                     }
                     
                     if(!strcmp(sent, ADD)){
-                        grpchat_config(srv_sd, users);
+                        new_sd = grpchat_config(srv_sd, users);
+                        if(new_sd){
+                            FD_SET(new_sd, &master_chat);
+                            fdmax = (new_sd > fdmax) ? new_sd : fdmax; 
+                            sockets[num_sd++] = new_sd; 
+                            /*sprintf(buffer, "%d", new_sd);
+                            send_dev(new_sd, buffer);*/
+                        }
                         break;
                     }
 
-                    send_dev(sd, sent);
+                    for(j=0; j < num_sd; j++){
+                        send_dev(sockets[j], sent);
+                    }
 
                     if(!strcmp(sent, EXIT)){
                         //printf("VOGLIO USCIRE\n\n");
@@ -862,22 +963,22 @@ void chat(int sd, char dev_usr[1024]){
                     fflush(stdout); */
                 }
 
-                else if(i == sd){
-
-                    ret = recv(sd, coming, sizeof(coming), 0);
-
+                else {
+                    
+                    ret = recv(i, coming, sizeof(coming), 0);
+                    
                     if(ret > 0){
                         fflush(stdin);
                         fflush(stdout);
                         if(!strcmp(coming, SHARE)){
-                            send_dev(sd, RFD);
-                            recv(sd, filename, sizeof(filename), 0);
+                            send_dev(i, RFD);
+                            recv(i, filename, sizeof(filename), 0);
                             printf("%s sta condividendo un file !\n", dev_usr);
                             strcpy(percorso, username);
                             strcat(percorso, "/");
                             strcat(percorso, filename);
-                            send_dev(sd, RFD);
-                            recv(sd, buffer, sizeof(buffer), 0);
+                            send_dev(i, RFD);
+                            recv(i, buffer, sizeof(buffer), 0);
                             fpptr = fopen(percorso, "a");
                             fflush(fpptr);
                             fprintf(fpptr, "%s", buffer);
@@ -898,7 +999,7 @@ void chat(int sd, char dev_usr[1024]){
                                 fflush(fptr);
                                 fprintf(fptr, "%s\n", coming);
                                 fflush(fptr);
-                            } 
+                            }
                         }
                         fflush(stdout);
                         fflush(stdin);
@@ -912,6 +1013,90 @@ void chat(int sd, char dev_usr[1024]){
         }
     }
 }
+
+/*
+void grp_chat(int sd, char dev_usr[1024]){
+    fd_set master_chat;
+    fd_set read_chat;
+    int fdmax;
+    int i;
+    int ret;
+    bool online = true;
+    chatting = true;
+    dev_sd = sd; 
+
+    FD_ZERO(&read_chat);
+    FD_ZERO(&master_chat);
+    FD_SET(STDIN, &master_chat);
+    FD_SET(sd, &master_chat);
+
+    fdmax = sd;
+    char sent[1024];
+    char coming[1024];
+
+    printf("Chat con %s iniziata !\n\n", dev_usr);
+    printf("--->");
+    printf(" Per inviare un messaggio occorre digitare e premere invio.\n");
+    printf("--->");
+    printf(" Per aggiungere un partecipante digitare '\\u'\n");
+    printf("--->");
+    printf(" Per condividere un file digitare 'share nomefile'\n");
+    printf("--->");
+    printf(" Per eliminare la cronologia della chat '\\d'\n");
+    printf("--->");
+    printf(" Per uscire dalla chat digitare '\\q'\n\n");
+
+    while(1){
+        read_chat = master_chat;
+        fflush(stdout);
+        select(fdmax + 1, &read_chat, NULL, NULL, NULL);
+
+        for(i=0; i<=fdmax; i++) {
+            if(FD_ISSET(i, &read_chat)) {
+
+                if(!i){
+                    memset(sent, 0, sizeof(sent));
+                    memset(coming, 0, sizeof(coming));
+
+                    strcpy(sent, msg());
+
+                    send_dev(sd, sent);
+
+                    if(!strcmp(sent, EXIT)){
+                        chatting = false;
+                        return;
+                    }
+
+
+                    if(!online){
+                        printf("%s *\n", sent);
+                    } else{
+                        printf("%s **\n", sent);
+                    }
+
+                    strcat(sent, " **");
+
+                }
+
+                else {
+                    
+                    ret = recv(i, coming, sizeof(coming), 0);
+                    
+                    if(ret > 0){
+                        fflush(stdin);
+                        fflush(stdout);
+                        printf("%s\n", coming);
+                        fflush(stdout);
+                        fflush(stdin);
+                    }
+
+                }
+            }
+        
+        }
+    }
+}
+*/
 
 // Questa funzione si occupa della configurazione pre-chat del Device
 void chat_config(int sd){
@@ -1086,6 +1271,14 @@ void chat_config(int sd){
 
         recv(dev_sd, buffer, sizeof(buffer), 0);
         if(!strcmp(buffer, RFD)){
+            strcpy(dev_users[num_users].usr, dev_usr);
+            dev_users[num_users].port = dev_port;
+            num_users++;
+            /*printf("num_users: %d\n", num_users);
+            int j=0;
+            for(j=0; j < num_users; j++){
+                printf("user:%s\nport:%d.\n", dev_users[j].usr, dev_users[j].port);
+            }*/
             chat(dev_sd, dev_usr);
             break;
         }
@@ -1277,6 +1470,7 @@ int main(int argc, char* argv[]){
     int newfd;                                      // Socket di comunicazione
     char buffer[1024];
     char command[1024];
+    char dev_usr[1024];
     char wait[1024];
     int i;
     int addrlen;
@@ -1401,7 +1595,7 @@ int main(int argc, char* argv[]){
             if(FD_ISSET(i, &read_fds)) {
                 if(!i){
                     scanf("%s", buffer);
-                    //printf("Gestione comando %s\n", buffer);
+                    printf("Gestione comando %s\n", buffer);
 
                     if(!strcmp(buffer, "hanging")){
                         // Gestione comando hanging
@@ -1439,8 +1633,11 @@ int main(int argc, char* argv[]){
                 else if(i == listener) {                    // Se quello pronto e' il listener
   
                     addrlen = sizeof(dev_addr);
-
+                    struct sockaddr_in *prova = &dev_addr;
                     newfd = accept(listener, (struct sockaddr *)&dev_addr, (socklen_t*)&addrlen);
+
+                    printf("Listener: aggiungo nuovo socket al set\n");
+                    printf("%d\n", ntohs((&dev_addr)->sin_port));
 
                     FD_SET(newfd, &master);                     // Aggiungo il nuovo socket al master
                     fdmax = (newfd > fdmax) ? newfd : fdmax;    // Aggiorno fdmax
@@ -1468,9 +1665,42 @@ int main(int argc, char* argv[]){
 
                             send_dev(i, RFD);
 
-                            recv(i, buffer, sizeof(buffer), 0);
+                            recv(i, dev_usr, sizeof(dev_usr), 0);
 
-                            printf("%s vuole iniziare una chat con te !\n\n", buffer);
+                            printf("%s vuole iniziare una chat con te !\n\n", dev_usr);
+
+                            printf("---> Digita qualsiasi cosa per entrare nella chat.\n");
+                            printf("---> Se si vuole rifutare la chat digitare '\\q'.\n\n");
+
+                            scanf("%s", wait);
+
+                            if(!strcmp(wait, EXIT)){
+                                send_dev(i, NO);
+                                //close(i);
+                                break;
+                            }
+                            
+                            //buffer contiene dev_usr
+                            pendent_before_chat(srv_sd, dev_usr);
+
+                            send_dev(i, RFD);
+
+                            strcpy(dev_users[num_users].usr, dev_usr);
+                            //dev_users[num_users].port = dev_port;
+                            num_users++;
+
+                            //printf("Gestione CHAT\n");
+                            //printf("Hai un nuovo messaggio !\n");
+                            chat(i, dev_usr);
+                            second_print();
+                        }
+                        else if(!strcmp(command, CMD_GRPCHAT)){
+
+                            send_dev(i, RFD);
+
+                            recv(i, dev_usr, sizeof(dev_usr), 0);
+
+                            printf("%s ti ha invitato ad una chat di gruppo !\n\n", dev_usr);
 
                             printf("---> Digita qualsiasi cosa per entrare nella chat.\n");
                             printf("---> Se si vuole rifutare la chat digitare '\\q'.\n\n");
@@ -1482,13 +1712,10 @@ int main(int argc, char* argv[]){
                                 break;
                             }
 
-                            pendent_before_chat(srv_sd, buffer);
-
                             send_dev(i, RFD);
 
-                            //printf("Gestione CHAT\n");
-                            //printf("Hai un nuovo messaggio !\n");
-                            chat(i, buffer);
+                            chat(i, dev_usr);
+
                             second_print();
                         }
                     } 
