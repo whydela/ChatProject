@@ -563,6 +563,9 @@ int grpchat_config(int sd, char users[1024]){
 
     send_srv(sd, dev_usr);
 
+    strcat(users, dev_usr);
+    strcat(users, "\n");
+
     recv(sd, buffer, sizeof(buffer), 0);
 
     port = atoi(buffer);
@@ -618,8 +621,20 @@ int grpchat_config(int sd, char users[1024]){
         }
     }
 
-    //send_dev(dev_sd, grp_users);
+    char prova[1024];
+    char invio[1024];
+    int j;
 
+    memset(invio, 0, sizeof(invio));
+    memset(prova, 0, sizeof(prova));
+
+    for(j=0; j < num_users; j++){
+        printf("%s %d\n", dev_users[j].usr, dev_users[j].port);
+        sprintf(prova, "%s %d\n", dev_users[j].usr, dev_users[j].port);
+        strcat(invio, prova);
+    }
+
+    send(dev_sd, invio, sizeof(invio), 0);
 
     return dev_sd;
 
@@ -882,9 +897,11 @@ void chat(int sd, char dev_usr[1024]){
     strcpy(buffer1, buffer);
     fptr = fopen(buffer, "r");
     //strcpy(chatt, filetobuffer(fptr));
+    // Stampiamo la chat con la funzione filetobuffer()
     printf("%s", filetobuffer(fptr));
     fclose(fptr);
     //printf("Il percorso e' %s\n", buffer1);
+    // Apriamo la chat in append per aggiornarla ad ogni messaggio
     fptr = fopen(buffer1, "a");
     fflush(fptr);
 
@@ -930,7 +947,7 @@ void chat(int sd, char dev_usr[1024]){
                         if(new_sd){
                             FD_SET(new_sd, &master_chat);
                             fdmax = (new_sd > fdmax) ? new_sd : fdmax; 
-                            sockets[num_sd++] = new_sd; 
+                            sockets[num_sd++] = new_sd;
                             /*sprintf(buffer, "%d", new_sd);
                             send_dev(new_sd, buffer);*/
                         }
@@ -1633,11 +1650,11 @@ int main(int argc, char* argv[]){
                 else if(i == listener) {                    // Se quello pronto e' il listener
   
                     addrlen = sizeof(dev_addr);
-                    struct sockaddr_in *prova = &dev_addr;
+                    //struct sockaddr_in *prova = &dev_addr;
                     newfd = accept(listener, (struct sockaddr *)&dev_addr, (socklen_t*)&addrlen);
 
-                    printf("Listener: aggiungo nuovo socket al set\n");
-                    printf("%d\n", ntohs((&dev_addr)->sin_port));
+                    /*printf("Listener: aggiungo nuovo socket al set\n");
+                    printf("%d\n", (&dev_addr)->sin_port);*/
 
                     FD_SET(newfd, &master);                     // Aggiungo il nuovo socket al master
                     fdmax = (newfd > fdmax) ? newfd : fdmax;    // Aggiorno fdmax
@@ -1714,6 +1731,13 @@ int main(int argc, char* argv[]){
 
                             send_dev(i, RFD);
 
+                            memset(buffer, 0, sizeof(buffer));
+
+                            // Ricevo la lista 
+                            recv(i, buffer, sizeof(buffer), 0);
+                           
+                            printf("%s", buffer);
+                            
                             chat(i, dev_usr);
 
                             second_print();
