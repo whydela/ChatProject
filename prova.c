@@ -66,7 +66,7 @@ int main(){
     users = timestamp;
     char lista[1024];
     char stringa[1024];
-    char buffer[1024];
+    //char buffer[1024];
     int i = 0;
     int j = 0;
     int ch = 0;
@@ -91,32 +91,36 @@ int main(){
 
     fptr = fopen("srv/usr_online.txt", "r");
 
-    while(fgets(scorre, 1024, fptr) != NULL){
-        if(!(i%3)){     // Stiamo visionando un username
-            //printf("online_user: %s", scorre);
-            ch = 0;
-            users = timestamp;
-            while(sscanf(users, "%s", stringa)==1){
-                ch = strlen(stringa)+1;
-                users += ch;
-                strcat(stringa, "\n");
-                //printf("chat_user: %s", stringa);
-                if(!strcmp(stringa, scorre)){
-                    //printf("%s e' stato trovato\n", scorre);
-                    find = true;
-                    break;
-                }
-            }
-            if(!find){
-                strcat(buffer, "-> ");
-                strcat(buffer, scorre);
-            } 
-            find = false;
+    char buffer[] = {"lore 4246\ndylan 4247\nspera 4248\ndiego 4245\ncipo 4249"};
+    char* estrai = buffer;
+    char scorri[1024];
+    memset(scorri, 0, sizeof(scorri));
+    //struct users chat_user
+    while(sscanf(estrai, "%s", scorri)==1){
+        if(!scorri){
+            printf("via");
         }
-        i++;
+        if(strcmp(scorri, "dylan")){
+            printf("USR: %s\n", scorri);
+            //strcpy(chat_user[num_users].usr, estrai);
+            ch = strlen(scorri)+1;
+            estrai += ch;
+            sscanf(estrai, "%s", scorri);
+            printf("PORT: %s\n", scorri);
+            ch = strlen(scorri)+1;
+            estrai += ch;
+        } else{
+            ch = strlen(scorri)+1;
+            estrai += ch;
+            sscanf(estrai,"%s", scorri);
+            ch = strlen(scorri)+1;
+            estrai += ch;
+        }
     }
+    
+    
 
-    printf("Lista degli utenti online:\n%s", buffer);
+    printf("Lista degli utenti online:\n%s\n", buffer);
 
     // fclose(fptr);
 
