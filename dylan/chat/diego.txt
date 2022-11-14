@@ -1,5 +1,13 @@
-[11-11-2022|17:1:55] 	 dylan: d **
-[11-11-2022|17:6:55] 	 diego: d
-[11-11-2022|17:6:57] 	 dylan: a **
-[11-11-2022|17:9:36] 	 diego: as
-[11-11-2022|17:9:37] 	 dylan: d **
+[14-11-2022|13:27:16] 	 diego: s
+[14-11-2022|13:27:21] 	 diego: a
+[14-11-2022|13:27:24] 	 diego: ddddff
+[14-11-2022|13:27:31] 	 diego: andiamo a mens ?
+[14-11-2022|13:27:33] 	 lore: no
+[14-11-2022|13:28:9] 	 tommi e' entrato nella chat !
+[14-11-2022|13:28:10] 	 diego: a
+[14-11-2022|13:28:12] 	 tommi: a
+[14-11-2022|13:28:13] 	 dylan: a **
+[14-11-2022|13:28:14] 	 lore: a
+[14-11-2022|13:28:20] 	 tommi e' entrato nella chat !
+[14-11-2022|13:28:33] 	 tommi e' entrato nella chat !
+[14-11-2022|13:28:53] 	 tommi e' entrato nella chat !

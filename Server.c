@@ -29,9 +29,13 @@
 #define NO "/NO\0"
 #define EXIT "\\q\0"
 #define OFFLINE "/OFFLINE\0"
+#define SRV_OUT "/SRV_OUT\0"
 
 char buffer[1024];
 char messaggio[1024];
+int users = 0;
+int sockets[20];
+int fdmax;                                      // Numero max di descrittori
 
 
 void first_print(){
@@ -143,6 +147,7 @@ char* filetobuffer(FILE* fptr){
 
 }
 
+/*
 bool ls(char* directory, char* file){
 
     DIR *mydir;
@@ -161,6 +166,7 @@ bool ls(char* directory, char* file){
     return false;
 
 }
+*/
 
 int count_lines(FILE* fptr){
 
@@ -236,8 +242,8 @@ void send_dv(int sd, char* cmd){
     ret = send(sd, cmd, strlen(cmd)+1, 0);
 
     if(ret < 0){
-        perror("Errore in fase di invio segnale: \n");
-        exit(1);
+        //perror("Errore in fase di invio segnale: \n");
+        //exit(1);
     }
     
     //printf("Segnale %s inviato\n", cmd);
@@ -1102,11 +1108,21 @@ void srv_help(){
     
 }
 
-void handler(int sig){
+void srv_out(){
 
+    int i;
     FILE* fptr = fopen("srv/usr_online.txt", "w+");
     fclose(fptr);
+    for(i=0; i <=users; i++){
+        send_dv(sockets[i], SRV_OUT);
+    }
     exit(0);
+
+}
+
+void handler(int sig){
+
+    srv_out();
 
 }
 
@@ -1117,7 +1133,6 @@ int main(int argc, char *argv[]) {
     int ret;                                        // Variabile di controllo
     fd_set master;                                  // Set principale gestito dal programmatore con le macro 
     fd_set read_fds;                                // Set di lettura gestito dalla select 
-    int fdmax;                                      // Numero max di descrittori
     struct sockaddr_in my_addr;                     // Indirizzo Server
     struct sockaddr_in cl_addr;                     // Indirizzo Device 
     int listener;                                   // Socket di ascolto
@@ -1200,9 +1215,7 @@ int main(int argc, char *argv[]) {
 
                     else if(!strcmp(buffer, "esc")){
                         // Gestione comando esc
-                        FILE* fptr = fopen("srv/usr_online.txt", "w+");
-                        fclose(fptr);
-                        exit(0);
+                        srv_out();
                     }
 
                     else if(!strcmp(buffer, "help")){
@@ -1272,6 +1285,7 @@ int main(int argc, char *argv[]) {
                         else if(!strcmp(command, CMD_TMS)){
                             //printf("Gestione timestamp\n");
                             dev_online(i);
+                            sockets[users++] = i;
                         }
 
                         // Gestione chat
@@ -1310,7 +1324,7 @@ int main(int argc, char *argv[]) {
 
                     } 
                     else{
-                        perror("Errore nella reiceve: ");
+                        //perror("Errore nella reiceve: ");
                     }
                     break;
                 } 
