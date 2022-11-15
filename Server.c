@@ -37,7 +37,7 @@ int users = 0;
 int sockets[20];
 int fdmax;                                      // Numero max di descrittori
 
-
+// Questa funzione si occupa della prima stampa del Server
 void first_print(){
     //int i;
     //printf("\n");
@@ -60,6 +60,7 @@ void first_print(){
 
 }
 
+// Questa funzione si occupa della configurazione di rete del Server
 int ip_config(struct sockaddr_in* addr, int port){
 
     int sd;
@@ -87,6 +88,7 @@ int ip_config(struct sockaddr_in* addr, int port){
 
 }
 
+// Questa funzione si occupa della configurazione di rete al Device
 int dev_config(struct sockaddr_in* dev_addr, int dev_port){
 
     int sd;
@@ -100,14 +102,12 @@ int dev_config(struct sockaddr_in* dev_addr, int dev_port){
     return sd;
 }
 
+// Questa funzione controlla se una data stringa e' presente in un file puntato da ptr
 bool check_word(FILE* ptr, char stringa[1024]){
-
-    //printf("Checkiamo la parola %s\n", stringa);
 
     char buffer[1024];
 
     while(fscanf(ptr, "%s", buffer)==1){
-        //printf("Trovo %s\n", buffer);
         if(!strcmp(buffer, stringa)){
             return true;
         }
@@ -116,6 +116,7 @@ bool check_word(FILE* ptr, char stringa[1024]){
     return false;
 }
 
+// Questa funzione inserisce in un buffer il contenuto del file puntato da fptr
 char* filetobuffer(FILE* fptr){
 
     char scorre[1024];
@@ -147,27 +148,7 @@ char* filetobuffer(FILE* fptr){
 
 }
 
-/*
-bool ls(char* directory, char* file){
-
-    DIR *mydir;
-    struct dirent *myfile;
-
-    mydir = opendir(directory);
-    
-    while((myfile = readdir(mydir)) != NULL) {
-        if(!strcmp(myfile->d_name, file)){
-            return true;
-        }
-    }
-
-    closedir(mydir);
-    
-    return false;
-
-}
-*/
-
+// Questa funzione conta le linee di un file (utile per il comando di Hanging)
 int count_lines(FILE* fptr){
 
     int ch = 0;
@@ -184,6 +165,7 @@ int count_lines(FILE* fptr){
 
 }
 
+// Questa funzione cambia il file usr_log.txt, cambiando lo 0 indicante l'ONLINE con il timestamp corrente
 void change_log(char username[1024]){
     
     FILE* fptr, *fpptr;
@@ -193,6 +175,7 @@ void change_log(char username[1024]){
     time_t rawtime;
     struct tm * timeinfo;
 
+    // Ci ricaviamo il timestamp corrente
     time(&rawtime);
     timeinfo = localtime(&rawtime);
 
@@ -203,19 +186,20 @@ void change_log(char username[1024]){
 
     memset(timestamp, 0, sizeof(timestamp));
 
+    // Formato del timestamp:
     sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
     timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 
     // Questo passaggio permette di aggiornare il timestamp di logout degli utenti
 
     while(fscanf(fpptr, "%s", buffer)==1){
-        if(!strcmp(buffer, username)){
+        if(!strcmp(buffer, username)){  // Troviamo l'username ricercato
             while(i < 4){
-                if(i==3 && !strcmp(buffer, "0")){
-                    fprintf(fptr, "%s\n", timestamp);
+                if(i==3 && !strcmp(buffer, "0")){       // i == 3 vuol dire che siamo nella riga del timestamp
+                    fprintf(fptr, "%s\n", timestamp);   // Se e' a 0 -> si stampa il timestamp corrente
                     break;
                 } else{
-                    fprintf(fptr, "%s\n", buffer);
+                    fprintf(fptr, "%s\n", buffer);      // Altrimenti niente
                 }
                 fscanf(fpptr, "%s", buffer);
                 i++;
@@ -226,65 +210,26 @@ void change_log(char username[1024]){
         }
     }
 
+    // Rimuoviamo il file vecchio
     remove("srv/usr_log.txt");
+    // Rinominiamo il file nuovo come prima
     rename("srv/usr_log1.txt", "srv/usr_log.txt");
+
+    // A questo punto otteniamo il file modificato
 
     fclose(fptr);
     fclose(fpptr);
 
 }
 
+// Questa funzione invia il comando CMD ad un Device
 void send_dv(int sd, char* cmd){
-    // In questo momento sono connesso al server 
-    int ret;
     
-    //printf("Mando il segnale %s\n", cmd);
-    ret = send(sd, cmd, strlen(cmd)+1, 0);
-
-    if(ret < 0){
-        //perror("Errore in fase di invio segnale: \n");
-        //exit(1);
-    }
-    
-    //printf("Segnale %s inviato\n", cmd);
+    send(sd, cmd, strlen(cmd)+1, 0);    
     
 }
 
-/*
-void dev_port(int sd){
-
-    char username[1024];
-    char port[1024];
-    char scorre[1024];
-
-    FILE* fptr = fopen("srv/usr_log.txt", "r");
-
-    send_dv(sd, RFD);
-    recv(sd, username, sizeof(username), 0);
-
-    send_dv(sd, RFD);
-    recv(sd, port, sizeof(port), 0);
-
-    while(fscanf(fptr, "%s", scorre)==1){
-        if(!strcmp(scorre, username)){
-            fscanf(fptr, "%s", scorre);
-            if(!strcmp(scorre, port)){
-                break;
-            }
-            else{
-                send_dv(sd, scorre);
-            }
-        }
-        if(!strcmp(scorre, port)){
-            send_dv(sd, NO);
-        }
-    }
-
-    send_dv(sd, YES);
-
-}
-*/
-
+// Questa funzione si occupa della registrazione del Device
 void dev_reg(int sd){
 
     char username[1024];
@@ -294,17 +239,15 @@ void dev_reg(int sd){
 
         FILE* fptr;
         // Ricevo username
-        recv(sd, username, sizeof(username), 0);
+        recv(sd, username, sizeof(username), 0);     
 
-        //printf("Ricevuto %s\n",username);
-        // creo/apro un file contenente tutti gli username registrati
-        
+        // Creo/apro un file contenente tutti gli username registrati
+        fptr = fopen("srv/usr_all.txt", "a+");
+        fflush(fptr);
 
-        // Questa funzione ricerca una stringa in un file, 
+        // Questa funzione ricerca una stringa in un file:
         // Restituisce true se la trova, altrimenti false
         // Prende in ingresso il puntatore del file e la stringa ricercata
-        fptr = fopen("srv/usr_all.txt", "r");
-
         if(fptr && check_word(fptr, username)){
             // Dico al device che l'username non va bene
             // YES sta per: c'e' nella lista degli username registrati
@@ -317,20 +260,17 @@ void dev_reg(int sd){
         // NO sta per: non c'e' nella lista degli username registrati
         send_dv(sd, NO);
 
-        if (fptr) {
+        if(fptr){
             fclose(fptr);
         } 
 
         fptr = fopen("srv/usr_all.txt", "a");
-
-        if(!fptr){
-            printf("Errore nell'apertura del file\n");
-        }
+        fflush(fptr);
 
         fprintf(fptr, "%s\n", username);
 
         // Facciamo in modo che i permessi siano attivi solo per l'owner del file
-        // Come se il server avesse delle informazioni non accessibili dai device
+        // Come se il server avesse delle informazioni non accessibili dai Device
         chmod("srv/usr_all.txt", S_IRWXU);
 
         if(fptr){
@@ -339,7 +279,6 @@ void dev_reg(int sd){
 
         // Adesso gestiamo la password
         recv(sd, password, sizeof(password), 0);
-        //printf("Ricevuto %s\n",password);
 
         // Apro/creo un file contenente tutti gli username registrati con la password affiancata
         fptr = fopen("srv/usr_psw.txt", "a+");
@@ -355,10 +294,11 @@ void dev_reg(int sd){
         break;
     }
 
-    printf("%s registrato nel sistema\n", username);
+    //printf("%s registrato nel sistema\n", username);
 
 }
 
+// Questa funzione si occupa del login del Device
 bool dev_log(int sd){
 
     char username[1024];
@@ -367,14 +307,11 @@ bool dev_log(int sd){
     FILE* fptr;
     
     while(1){
-        //printf("Gestione username\n");
         // Ricevo username
         recv(sd, username, sizeof(username), 0);
 
-        //printf("Ricevuto %s\n",username);
-
         if(!strcmp(username, "signup")){
-            printf("Si vuole registrare\n");    
+            //printf("Si vuole registrare\n");    
             return true;
         }
 
@@ -384,7 +321,6 @@ bool dev_log(int sd){
         fptr = fopen("srv/usr_all.txt", "r");
 
         if(!fptr){
-            printf("Errore nell'apertura del file\n");
             send_dv(sd, NO);
             continue;
         }
@@ -414,12 +350,9 @@ bool dev_log(int sd){
     // Adesso gestiamo la password
     while(1){
 
-            //printf("Gestione password\n");
             recv(sd, password, sizeof(password), 0);
-            //printf("Ricevuto %s\n", password);
 
             if(!strcmp(password, "signup")){
-                //printf("Si vuole registrare\n");    
                 return true;
             }
 
@@ -453,6 +386,7 @@ bool dev_log(int sd){
 
 }
 
+// Questa funzione si occupa della configurazione del Device
 void dev_online(int sd){
 
     char buffer[1024];
@@ -466,21 +400,19 @@ void dev_online(int sd){
     // Ricevo username
     send_dv(sd, RFD);
     recv(sd, username, sizeof(username), 0);
-    //printf("Ricevuto %s\n", username);
 
     time(&rawtime);
 
     // Converto l'ora
     timeinfo = localtime(&rawtime);
 
-    // Creo il timestamp
-
     fptr = fopen("srv/usr_log.txt", "a+");
-    //online = check_word(fptr, username);
-
-    send_dv(sd, RFD);
+    
+    // Creo il timestamp
     sprintf(timestamp, "%d-%d-%d|%d:%d:%d", timeinfo->tm_mday, timeinfo->tm_mon+1, timeinfo->tm_year+1900,
     timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+
+    send_dv(sd, RFD);
     
     recv(sd, &port, sizeof(port), 0);
 
@@ -496,6 +428,7 @@ void dev_online(int sd){
     // Altrimenti si sovrascrive il timestamp di login mettendo quello corrente, 
     // e quello di log out mettendo 0
     else{
+        // Sempre con la tecnica della funzione change_log()
         fppptr = fopen("srv/usr_log.txt", "r");
         fpptr = fopen("srv/usr_log1.txt", "a+");
         fflush(fpptr);
@@ -527,9 +460,6 @@ void dev_online(int sd){
         fclose(fptr);
     }
 
-    //printf("Ricevuto %s\n", timestamp);
-
-
     memset(buffer, 0, sizeof(buffer));
     sprintf(buffer, "%s\n%s\n%d", username, timestamp, port);
 
@@ -548,12 +478,11 @@ void dev_online(int sd){
         fclose(fptr);
     }
 
-
 }
 
+// Questa funzione crea la lista inviata al Device nel momento in cui vuole aprire una nuova chat
 void crea_lista(int sd, char username[1024]){
     
-    //char buffer[1024];
     char scorre[1024];
     char lista[1024];
 
@@ -580,7 +509,6 @@ void crea_lista(int sd, char username[1024]){
             continue;
         }
 
-        //printf("Vedo %s\n", scorre);
         fflush(fptr);
 
         // Se e' online
@@ -603,11 +531,10 @@ void crea_lista(int sd, char username[1024]){
 
 }
 
+// Questa funzione controlla se un dato utente e' online (quindi raggiungibile)
 bool unreachable(int sd, char username[1024]){
 
     FILE* fptr;
-    //struct sockaddr_in dev_addr;
-    //int dev_sd, ret;
     char dev_port[1024];
     char scorre[1024];
 
@@ -645,6 +572,7 @@ bool unreachable(int sd, char username[1024]){
 
 }
 
+// Questa funzione crea un rubrica con gli users che un partecipante di una chat puo' aggiungere
 void dev_rubric(int sd){
 
     char lista[1024];
@@ -663,30 +591,22 @@ void dev_rubric(int sd){
 
     // Si riceve l'username che vuole aggiungere un utente alla chat
     recv(sd, buffer, sizeof(buffer), 0);
-    //printf("\nRicevo %s", buffer);
     strcpy(lista, buffer);
     users = lista;
 
     memset(buffer, 0, sizeof(buffer));
 
-    //strcpy(lista, lista);
-
     fptr = fopen("srv/usr_online.txt", "r");
 
     while(fgets(scorre, 1024, fptr) != NULL){
-        if(!(i%3)){     // Stiamo visionando un username
-            //printf("online_user: %s", scorre);
+        if(!(i%3)){     // Stiamo visionando un username (ogni username ha 3 campi)
             ch = 0;
             users = lista;
-            //printf("Users: %s", users);
             while(sscanf(users, "%s", stringa)==1){
-                //printf("Entro\n");
                 ch = strlen(stringa)+1;
                 users += ch;
                 strcat(stringa, "\n");
-                //printf("chat_user: %s", stringa);
                 if(!strcmp(stringa, scorre)){
-                    //printf("%s e' stato trovato\n", scorre);
                     find = true;
                     break;
                 }
@@ -702,7 +622,6 @@ void dev_rubric(int sd){
 
     fclose(fptr);
 
-    //printf("Lista degli utenti online:\n%s", buffer);
     if(buffer[0] == '-'){
         send_dv(sd, buffer);
     } else{
@@ -712,11 +631,11 @@ void dev_rubric(int sd){
 
     
     recv(sd, buffer, sizeof(buffer), 0);
-    //printf("Ricevo %s\n", buffer);
 
     fptr = fopen("srv/usr_log.txt", "r");
     fflush(fptr);
 
+    // Prepariamo il messaggio
     while(fscanf(fptr, "%s", stringa)==1){
         if(!strcmp(buffer, stringa)){
             fscanf(fptr, "%s", stringa);
@@ -724,13 +643,12 @@ void dev_rubric(int sd){
         }
     }
 
+    // Inviamoglielo
     send_dv(sd, stringa);
-
-    //printf("Invio %s\n", stringa);
-
 
 }
 
+// Questa funzione si occupa della chat offline di un Device
 void dev_chat_offline(int sd){
 
     char percorso[1024];
@@ -760,14 +678,12 @@ void dev_chat_offline(int sd){
     strcat(percorso, username);
     strcat(percorso, ".txt");
     // Creiamo il file srv/dev_usr/pendent/username.txt
-    //printf("Il percorso e' %s\n", percorso);
 
     while(1){
         recv(sd, buffer, sizeof(buffer), 0);
         if(!strcmp(buffer, EXIT)){
             return;
         }
-        //printf("%s\n", buffer);
         // Si invia il messaggio in una directory contenente i messaggi pendenti
         // percorso -> srv/dev_usr
         fpptr = fopen(percorso, "a");
@@ -778,6 +694,7 @@ void dev_chat_offline(int sd){
 
 }
 
+// Questa funzione si occupa della configurazione della chat di un Device
 void dev_chat(int sd){
 
     // Preparo la lista degli utenti online e offline
@@ -785,10 +702,8 @@ void dev_chat(int sd){
     crea_lista(sd, username);
     
     char buffer[1024];
-    //char scorre[1024];
     char percorso[1024];
     char dev_usr[1024];
-    //char dev_port[1024];
 
     FILE* fptr, * fpptr;
     // percorso -> srv/
@@ -812,8 +727,9 @@ void dev_chat(int sd){
 
         fclose(fptr);
 
+        // Se il Device non e' raggiungibile
         if(unreachable(sd, dev_usr)){
-            //printf("ESCO\n");
+            // Si esce
             return;
         }
 
@@ -832,7 +748,6 @@ void dev_chat(int sd){
         strcat(percorso, username);
         strcat(percorso, ".txt");
         // Creiamo il file srv/dev_usr/pendent/username.txt
-        //printf("Il percorso e' %s\n", percorso);
         fpptr = fopen(percorso, "a");
         fflush(fpptr);
         fprintf(fpptr, "%s\n", buffer);
@@ -843,6 +758,7 @@ void dev_chat(int sd){
 
 }
 
+// Questa funzione prepara il messaggio di hanging
 char* hang_msg(char percorso[1024]){
 
     char buffer[1024];
@@ -856,7 +772,6 @@ char* hang_msg(char percorso[1024]){
     bool timestamped = false;
     bool dev_usred;
 
-    //printf("%s\n", percorso);
 
     fptr = fopen(percorso, "r");
     fflush(fptr);
@@ -865,7 +780,6 @@ char* hang_msg(char percorso[1024]){
     fptr = fopen(percorso, "r");
     fflush(fptr);
     while(fscanf(fptr, "%s", buffer)==1){
-        //printf("buffer = %s, j = %d, i = %d, lines = %d.\n", buffer, j, i, lines);
         if(i==lines && !timestamped){   // Se siamo nell'ultima linea
             // Estraiamo il timestamp, che è la prima stringa 
             strcpy(timestamp, buffer);
@@ -895,6 +809,7 @@ char* hang_msg(char percorso[1024]){
 
 }
 
+// Questa funzione si occupa della gestione del comando hanging inviato da un Device
 void dev_hanging(int sd){
 
     char dev_usr[1024];
@@ -956,13 +871,12 @@ void dev_hanging(int sd){
 
 }
 
+// Questa funzione si occupa della gestione del comando show inviato da un Device
 void dev_show(int sd){
 
     char dev_usr[1024];
     char username[1024];
     char percorso[1024];
-    //char filename[1024];
-    //char buffer[1024];
     char msg[1024];
     FILE* fptr;
 
@@ -977,6 +891,7 @@ void dev_show(int sd){
     fptr = fopen("srv/usr_all.txt", "r");
     fflush(fptr);
 
+    // Se l'username non esiste
     if(!check_word(fptr, dev_usr)){
         send_dv(sd, NO);
         return;
@@ -990,9 +905,9 @@ void dev_show(int sd){
     strcat(percorso, dev_usr);
     strcat(percorso, ".txt");
 
-    //printf("Il percorso e' %s\n", percorso);
-
     fptr = fopen(percorso, "r");
+
+    // Se non ci sono messaggi pendenti
     if(!fptr){
         send_dv(sd, NO);
         return;
@@ -1000,11 +915,16 @@ void dev_show(int sd){
     
     fflush(fptr);
     strcpy(msg, filetobuffer(fptr));
+
+    // Inviamo al Device il messaggio di Show
     send_dv(sd, msg);
+
+    // Rimuoviamo il file
     remove(percorso);
 
 }
 
+// Questa funzione si occupa della gestione di logout di un Device
 void dev_out(int sd){
 
     FILE* fptr, *fpptr;
@@ -1023,8 +943,6 @@ void dev_out(int sd){
     send_dv(sd, RFD);
     recv(sd, timestamp, sizeof(timestamp), 0);
 
-    //printf("%s sta andando OFFLINE !\n", username);
-
     // Tolgo dalla lista degli utenti online l'utente selezionato
     fptr = fopen("srv/usr_online1.txt", "a");
     fpptr = fopen("srv/usr_online.txt", "r");
@@ -1037,7 +955,6 @@ void dev_out(int sd){
         if(!strcmp(buffer, username) || !strcmp(buffer, usr_port) || !strcmp(buffer, timestamp)){
             continue;
         }
-        //printf("%s\n", buffer);
         fprintf(fptr, "%s\n", buffer);
     }
 
@@ -1049,12 +966,13 @@ void dev_out(int sd){
 
     // Log sistemato
 
-    // Metto il timestamp di log out uguale a quello corrente
+    // Metto il timestamp di logout uguale a quello corrente
     change_log(username);
 
 
 }
 
+// Questa funzione si occupa del comando list inviato dal Server
 void srv_list(){
 
     char buffer[1024];
@@ -1064,6 +982,8 @@ void srv_list(){
     FILE* fptr = fopen("srv/usr_online.txt", "r");
 
     ch = fgetc(fptr);
+
+    // Se non c'e' niente
     if(ch == -1){
         printf("\n---> ATTENZIONE ! Nessun utente e' attualmente online.");
         fflush(stdout);
@@ -1072,7 +992,10 @@ void srv_list(){
 
     printf("\nLista degli utenti online:\n\n");
 
+    // Si stampa il carattere estratto prima
     printf("%c", ch);
+
+    // In questa parte prepariamo il messaggio
     while(fscanf(fptr, "%s", buffer)==1){
         int i = 0;
         strcat(buffer, "*");
@@ -1091,6 +1014,7 @@ void srv_list(){
 
 }
 
+// Questa funzione si occupa della stampa dovuta al comando help del Server
 void srv_help(){
 
     printf("\n--> Il comando 'list' permette di vedere la lista degli utenti online");
@@ -1108,12 +1032,14 @@ void srv_help(){
     
 }
 
+// Questa funzione si occupa della gestione di out del Server
 void srv_out(){
 
     int i;
     FILE* fptr = fopen("srv/usr_online.txt", "w+");
     fclose(fptr);
-    for(i=0; i <=users; i++){
+    // Inviamo a tutti il comando SRV_OUT
+    for(i=0; i <= users; i++){
         send_dv(sockets[i], SRV_OUT);
     }
     exit(0);
@@ -1155,7 +1081,7 @@ int main(int argc, char *argv[]) {
         printf("*");
     }
 
-    // Questa funzione si occupa della prima stampa a video
+    // Stampa a video
     first_print();
 
     // Si inizializza la porta del Server, atoi converte da char ad intero
@@ -1172,12 +1098,7 @@ int main(int argc, char *argv[]) {
     listener = ip_config(&my_addr, port);
 
     // Il server crea una coda di 10 ascolti 
-    ret = listen(listener, 10);
-
-    if(ret < 0){
-        perror("Errore nella listen: ");
-        exit(-1);
-    }
+    listen(listener, 10);
 
     // Creo la cartella del Server
     mkdir("srv", 0700);
@@ -1236,8 +1157,6 @@ int main(int argc, char *argv[]) {
 
                     newfd = accept(listener, (struct sockaddr *)&cl_addr, (socklen_t*)&addrlen);
 
-                    //printf("Ho accettato la connessione sul listener, aggiungo nuovo socket al SET\n");
-
                     FD_SET(newfd, &master);                     // Aggiungo il nuovo socket al master
                     fdmax = (newfd > fdmax) ? newfd : fdmax;    // Aggiorno fdmax
 
@@ -1254,78 +1173,62 @@ int main(int argc, char *argv[]) {
                     } 
                     else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
 
-                        //printf("Il comunicatore (socket %d) e' pronto\n", i);
-                        //printf("E' arrivato il comando %s\n", command);
-
-                        // Gestione registrazione
+                        // Gestione Registrazione
                         if(!strcmp(command,CMD_REG)){
                             // La funzione si occupa della corretta registrazione del device
                             // Prende in ingresso il socket descriptor
-                            //printf("Gestione registrazione\n");
                             dev_reg(i);
                         }
 
                         // Gestione login
-                        else if(!strcmp(command, CMD_PORT)){
-                            //printf("Gestione port\n");
-                            //dev_port(i);
-                        }
-
-                        // Gestione login
                         else if(!strcmp(command, CMD_LOG)){
-                            //printf("Gestione login \n");
                             // La funzione si occupa del login del device
                             // Prende in ingresso il socket descriptor
-                            if(dev_log(i)){
+                            if(dev_log(i)){     // In questo caso e' richiesta una registrazione
                                 continue;
                             }
                         }
 
                         // Gestione timestamp
                         else if(!strcmp(command, CMD_TMS)){
-                            //printf("Gestione timestamp\n");
                             dev_online(i);
+                            // Memorizziamo il socket
                             sockets[users++] = i;
                         }
 
                         // Gestione chat
                         else if(!strcmp(command, CMD_CHAT)){
-                            //printf("Gestione chat\n");
                             dev_chat(i);
                         }
                         
+                        // Gestione rubric
                         else if(!strcmp(command, CMD_RUBRIC)){
-                            //printf("Gestione rubric\n");
                             dev_rubric(i);
                         }
 
+                        // Gestione hanging
                         else if(!strcmp(command, CMD_HANGING)){
-                            //printf("Gestione hanging\n");
                             dev_hanging(i);
                         }
 
+                        // Gestione show
                         else if(!strcmp(command, CMD_SHOW)){
-                            //printf("Gestione show\n");
                             dev_show(i);
-                        }
+                        }  
 
+                        // Gestione logout del Device
                         else if(!strcmp(command, CMD_OFF)){
-                            //printf("Gestione out\n");
                             dev_out(i);
-                            //printf("Socket chiuso\n");
                             FD_CLR(i, &master);                 // Lo tolgo dal master 
                             close(i);                           // Lo chiudo
                         }
 
+                        // Gestione chat offline
                         else if(!strcmp(command, CMD_CHATOFF)){
-                            //printf("Gestione chat offline\n");
                             dev_chat_offline(i);
                         }
 
                     } 
-                    else{
-                        //perror("Errore nella reiceve: ");
-                    }
                     break;
                 } 
                 }     
