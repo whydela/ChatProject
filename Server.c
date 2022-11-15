@@ -1167,7 +1167,6 @@ int main(int argc, char *argv[]) {
                     ret = recv(i, command, sizeof(command), 0);   
 
                     if(!ret){                               // Socket i e' stato chiuso, Device offline
-                        //printf("Socket chiuso\n");
                         FD_CLR(i, &master);                 // Lo tolgo dal master 
                         close(i);                           // Lo chiudo
                     } 
