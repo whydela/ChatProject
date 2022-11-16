@@ -1,14 +1,1 @@
-[14-11-2022|15:17:46] 	 dylan e' entrato nella chat !
-[14-11-2022|15:17:54] 	 dylan: s
-[14-11-2022|15:18:17] 	 tommi e' entrato nella chat !
-[14-11-2022|15:18:48] 	 spera e' entrato nella chat !
-[14-11-2022|15:48:48] 	 lore: s **
-[14-11-2022|15:51:9] 	 dylan e' entrato nella chat !
-[14-11-2022|15:51:22] 	 dylan: d
-[14-11-2022|15:51:34] 	 spera e' entrato nella chat !
-[14-11-2022|15:51:46] 	 diego: s
-[14-11-2022|16:1:5] 	 diego: d
-[14-11-2022|16:1:7] 	 lore: g **
-[14-11-2022|16:1:13] 	 diego ha condiviso un file !
-[14-11-2022|16:1:25] 	 diego: dfs
-[14-11-2022|16:1:27] 	 diego: eccomi
+[15-11-2022|17:7:16] 	 diego: \Q

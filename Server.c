@@ -1113,6 +1113,7 @@ int main(int argc, char *argv[]) {
 
     // Handler per la gestione della disconnessione del device improvvisa
     signal(SIGINT, handler);    // CTRL+C
+    signal(SIGTSTP, handler);   // CTRL+Z
 
     // Ciclo principale
     while(1){

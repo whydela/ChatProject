@@ -209,7 +209,7 @@ void reg_config(int sd){
     send_srv(sd, CMD_REG);
 
     while(1){
-        printf("- Inserisca un username:\n\n-> ");
+        printf("- Inserisci un username:\n\n-> ");
 
         // Chiediamo a video l'username
         scanf("%s", username);
@@ -237,7 +237,7 @@ void reg_config(int sd){
     }
 
     while(1){
-        printf("\n- Inserisca una password:\n\n-> ");
+        printf("\n- Inserisci una password:\n\n-> ");
 
         // Si chiede la password
         scanf("%s", password);
@@ -267,7 +267,7 @@ bool log_config(int sd){
 
     send_srv(sd, CMD_LOG);
 
-    printf("\n- Inserisca l'username:\n\n-> ");
+    printf("\n- Inserisci l'username:\n\n-> ");
 
     while(1){
 
@@ -300,7 +300,7 @@ bool log_config(int sd){
     }
 
 
-    printf("\n- Inserisca la password:\n\n-> ");
+    printf("\n- Inserisci la password:\n\n-> ");
 
     i = 0;
 
@@ -900,13 +900,13 @@ void chat(int sd, char dev_usr[1024], bool grp){
     printf("--->");
     printf(" Per inviare un messaggio occorre digitare e premere invio.\n");
     printf("--->");
-    printf(" Per aggiungere un partecipante digitare '\\u'\n");
+    printf(" Per aggiungere un partecipante digitare '\\u'.\n");
     printf("--->");
-    printf(" Per condividere un file digitare 'share nomefile'\n");
+    printf(" Per condividere un file digitare 'share nomefile'.\n");
     printf("--->");
-    printf(" Per eliminare la cronologia della chat '\\d'\n");
+    printf(" Per eliminare la cronologia della chat '\\d'.\n");
     printf("--->");
-    printf(" Per uscire dalla chat digitare '\\q'\n\n");
+    printf(" Per uscire dalla chat digitare '\\q'.\n\n");
 
     // Backup del buffer
     strcpy(buffer1, buffer);
@@ -1240,7 +1240,7 @@ void chat_config(int sd){
     fclose(fptr);
 
     while(1){
-        printf("Si prega di inserire l'username con cui si vuole aprire una chat\n\n-> ");
+        printf("Si prega di inserire l'username con cui si vuole aprire una chat:\n\n-> ");
 
         // Inseriamo l'utente con cui si inizia la chat
         scanf("%s", dev_usr);
@@ -1313,7 +1313,7 @@ void chat_config(int sd){
 
     if(ret < 0){
         // Dispositivo offline
-        printf("Dispositivo offline\n");
+        printf("ATTENZIONE ! Dispositivo offline !\n");
         return;
     }
 
@@ -1363,7 +1363,7 @@ void chat_config(int sd){
             fptr = fopen(buffer, "a");
             fflush(fptr);
             printf("\nATTENZIONE ! %s ha rifiutato la chat !\n", dev_usr);
-            printf("\nLa chat e' stata aperta, i messaggi verranno comunque inviati\n");
+            printf("\nLa chat e' stata aperta, i messaggi verranno comunque inviati.\n");
             offline_chat(srv_sd, dev_usr, fptr);
             break;
         }
@@ -1717,12 +1717,10 @@ int main(int argc, char* argv[]){
 
                 }
 
-                else if(i == listener) {                    // Se quello pronto e' il listener
+                else if(i == listener) {                        // Se quello pronto e' il listener
   
                     addrlen = sizeof(dev_addr);
-
                     newfd = accept(listener, (struct sockaddr *)&dev_addr, (socklen_t*)&addrlen);
-
                     FD_SET(newfd, &master);                     // Aggiungo il nuovo socket al master
                     fdmax = (newfd > fdmax) ? newfd : fdmax;    // Aggiorno fdmax
                    
