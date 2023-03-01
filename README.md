@@ -29,8 +29,9 @@ Le operazioni permesse sono quindi: scrivere un messaggio, aggiungere un parteci
 Sotto questo menù abbiamo la cronologia della chat con quell’utente. Ogni Device dentro la sua cartella ha una cartella nominata chat/, che contiene un file con estensione .txt nominato come l’utente con cui ha iniziato una chat. 
 Il file contiene tutta la cronologia della chat stampata a video. La chat è implementata dalla funzione chat() dove è presente la select(): 
 l’insieme dei descrittori analizzati sono tutti quelli con cui il Device ha instaurato una connessione (tutti i partecipanti della chat), il listener e il descrittore del socket comunicante con il Server (se il Server va offline mentre un Device sta chattando con un altro, quando usciranno dalla chat dovranno terminare la loro esecuzione).
-Il formato del messaggio inviato o ricevuto è: [timestamp] username: messaggio (**) - timestamp ha il formato [dd-MM-yy|hh-mm-ss]. 
-- Accanto ad ogni messaggio inviato avremo un asterisco se l’utente destinatario è offline oppure ha lasciato la chat; due asterischi se l’utente destinatario è online e sta ricevendo in tempo reale i messaggi.
+Il formato del messaggio inviato o ricevuto è: [timestamp] username: messaggio (**) 
+timestamp ha il formato [dd-MM-yy|hh-mm-ss]. 
+Accanto ad ogni messaggio inviato avremo un asterisco se l’utente destinatario è offline oppure ha lasciato la chat; due asterischi se l’utente destinatario è online e sta ricevendo in tempo reale i messaggi.
 Per i messaggi ricevuti non sono presenti asterischi. Un utente x può aggiungere un utente y tramite il comando \u: a questo punto l’utente x invierà al Server una lista contenente i partecipanti dell’attuale chat, il Server comunicherà a x gli utenti online che possono essere aggiunti alla chat. 
 L’utente x aggiungerà y alla chat e gli comunicherà le informazioni (username e porta) dei partecipanti: y, una volta estratte tutte le informazioni, dovrà collegarsi a tutti loro. Ciò significa che si verranno a creare dei socket di comunicazione tra ogni partecipante. 
 Tali socket verranno poi inseriti nel suddetto insieme dei descrittori che verrà controllato dalla select() della funzione chat(). Ogni partecipante della chat memorizza tutte le informazioni riguardanti gli altri membri, in particolare l’username, la porta e il descrittore di socket con cui sono collegati.
