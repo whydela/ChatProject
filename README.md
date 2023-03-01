@@ -1,14 +1,9 @@
-**<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        h1{
-            text-align: center;
-        }
-    </style>
 </head>
 <body>
     <h1>Relazione Progetto Reti Informatiche (A.A. 2021/22)</h1>
