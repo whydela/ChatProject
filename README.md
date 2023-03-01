@@ -29,7 +29,6 @@
     Quando il Server termina la sua esecuzione provvede a cancellare tutto il contenuto del file.
     </p>
     
-    <p>
     Dopo aver effettuato il login o la sign up, il Device mostra a video un menù con tutti i comandi che è possibile eseguire.
     I comandi hanging e show sono in linea con quello richiesto dalle specifiche.
     Ora analizziamo il comportamento del comando chat: 
@@ -62,6 +61,6 @@
     Per quanto riguarda i Device, gli handler si comportano in modo diverso a seconda della loro esecuzione: per esempio, se un Device riceve SIGINT mentre sta chattando con un altro utente, prima di tutto comunica all’utente che uscirà dalla chat, successivamente potrà terminare la sua esecuzione. Per quanto riguarda il Server,
     l’handler si occupa di comunicare a tutti i Device che il Server sta terminando la sua esecuzione, come avviene nella gestione del comando esc.
     Le connessioni instaurate nel sistema seguono tutte il protocollo TCP e la conseguente affidabilità. Il Server gestisce le richieste in modo concorrente; per ogni Device online nel sistema viene creato un thread che gestisce le sue richieste. Le primitive utilizzate sono la pthread_create() e la pthread_exit(), quest’ultime sono state preferite alla fork() e alla exit() poiché comportano un overhead più basso e una gestione più efficiente della concorrenza. Per l’implementazione di questa politica è stata inclusa la libreria pthread.h ed è stata aggiunta l’opzione -lpthread al comando di compilazione del Server.
-    </p>
+    
 </body>
 </html>
