@@ -1,4 +1,4 @@
-Relazione Progetto Reti Informatiche (A.A. 2021/22)
+<h1>Relazione Progetto Reti Informatiche (A.A. 2021/22)<\h1>
 Il sistema di chatting è stato implementato in due file: Server.c e Device.c. 
 In Server.c è stato implementato il server mentre in Device.c è stato implementato il device.
 Il sistema viene avviato eseguendo il comando bash init.sh che avvia quattro terminali di cui uno per il server e tre per i device.
