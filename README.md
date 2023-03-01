@@ -1,4 +1,5 @@
 <h1>Relazione Progetto Reti Informatiche (A.A. 2021/22)</h1>
+<p>
 Il sistema di chatting è stato implementato in due file: Server.c e Device.c. 
 In Server.c è stato implementato il server mentre in Device.c è stato implementato il device.
 Il sistema viene avviato eseguendo il comando bash init.sh che avvia quattro terminali di cui uno per il server e tre per i device.
@@ -15,7 +16,9 @@ Questo file è un chiaro riferimento al registro indicato nelle specifiche.
 - srv/usr_online.txt → in questo file vengono memorizzati i seguenti dati relativi agli utenti online: username, timestamp di login e porta. 
 Il Server legge questo file per il comando list, e stampa a video le informazioni in esso contenuto, delimitate da asterischi. È compito del Server aggiornare il file nel caso di login e logout dei Device. 
 Quando il Server termina la sua esecuzione provvede a cancellare tutto il contenuto del file.
+</p>
 
+<p>
 Dopo aver effettuato il login o la sign up, il Device mostra a video un menù con tutti i comandi che è possibile eseguire.
 I comandi hanging e show sono in linea con quello richiesto dalle specifiche.
 Ora analizziamo il comportamento del comando chat: 
@@ -48,3 +51,4 @@ Per quanto riguarda la disconnessione improvvisa dei Device o del Server, il tut
 Per quanto riguarda i Device, gli handler si comportano in modo diverso a seconda della loro esecuzione: per esempio, se un Device riceve SIGINT mentre sta chattando con un altro utente, prima di tutto comunica all’utente che uscirà dalla chat, successivamente potrà terminare la sua esecuzione. Per quanto riguarda il Server,
 l’handler si occupa di comunicare a tutti i Device che il Server sta terminando la sua esecuzione, come avviene nella gestione del comando esc.
 Le connessioni instaurate nel sistema seguono tutte il protocollo TCP e la conseguente affidabilità. Il Server gestisce le richieste in modo concorrente; per ogni Device online nel sistema viene creato un thread che gestisce le sue richieste. Le primitive utilizzate sono la pthread_create() e la pthread_exit(), quest’ultime sono state preferite alla fork() e alla exit() poiché comportano un overhead più basso e una gestione più efficiente della concorrenza. Per l’implementazione di questa politica è stata inclusa la libreria pthread.h ed è stata aggiunta l’opzione -lpthread al comando di compilazione del Server.
+</p>
