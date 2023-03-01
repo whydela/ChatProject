@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <dirent.h>
+#include <pthread.h>
 
 #define STDIN 0
 #define RFD "RFD\0"
@@ -39,25 +40,11 @@ int fdmax;                                      // Numero max di descrittori
 
 // Questa funzione si occupa della prima stampa del Server
 void first_print(){
-    //int i;
-    //printf("\n");
-    /*for(i=0; i < 190; i++){
-        printf("*");
-    }
-    printf("\n");
-    for (i=0; i < 11; i++){
-        printf("\t");
-    }*/
-    /*for(i=0; i < 190; i++){
-        printf("*");
-    }*/
     printf("\n\n-> Si prega di inserire un comando:\n");
     printf("\n- list: Mostra gli utenti online.\n");
     printf("- esc:  Chiude il server.\n");
     printf("\n(Digitare 'help' per i dettagli dei comandi)\n\n-> ");
     fflush(stdout);
-    
-
 }
 
 // Questa funzione si occupa della configurazione di rete del Server
@@ -127,23 +114,6 @@ char* filetobuffer(FILE* fptr){
         strcat(buffer, scorre);
         fflush(fptr);
     }
-    /*
-    while(fscanf(fptr, "%s", scorre)==1){
-        if(timestamp){
-            strcat(scorre, "\t");
-            timestamp = false;
-        }
-        if(!strcmp(scorre, "*")){
-            strcat(buffer, "***\n");
-            timestamp = true;
-            continue;
-        }
-        else{
-            strcat(scorre, " ");
-        }
-        strcat(buffer, scorre);
-    }
-    */
     return buffer;
 
 }
@@ -226,7 +196,7 @@ void change_log(char username[1024]){
 void send_dv(int sd, char* cmd){
     
     send(sd, cmd, strlen(cmd)+1, 0);    
-    
+
 }
 
 // Questa funzione si occupa della registrazione del Device
@@ -401,6 +371,7 @@ void dev_online(int sd){
     send_dv(sd, RFD);
     recv(sd, username, sizeof(username), 0);
 
+
     time(&rawtime);
 
     // Converto l'ora
@@ -480,57 +451,6 @@ void dev_online(int sd){
 
 }
 
-// Questa funzione crea la lista inviata al Device nel momento in cui vuole aprire una nuova chat
-void crea_lista(int sd, char username[1024]){
-    
-    char scorre[1024];
-    char lista[1024];
-
-    FILE* fptr, *fpptr;
-
-    fptr = fopen("srv/usr_all.txt", "r");
-    fflush(fptr);
-    
-    // Ready for data
-    send_dv(sd, RFD);
-
-    // Si riceve l'username che vuole iniziare la chat
-    recv(sd, username, sizeof(username), 0);
-
-    memset(lista, 0, sizeof(lista));        // Pulizia
-
-    while(fscanf(fptr, "%s", scorre)==1){
-
-        fpptr = fopen("srv/usr_online.txt", "r");
-        fflush(fpptr);
-        
-        // Se si trova lo stesso username si ignora
-        if(!strcmp(scorre, username)){
-            continue;
-        }
-
-        fflush(fptr);
-
-        // Se e' online
-        if(check_word(fpptr, scorre)){
-           strcat(scorre, ", ONLINE.");
-        }
-        // Se e' offline
-        else{
-            strcat(scorre, ", OFFLINE.");
-        }
-        strcat(scorre, "\n");
-        strcat(lista, scorre);
-        fclose(fpptr); 
-    }
-
-    fclose(fptr);
-
-    // Inviamo al device la lista
-    send_dv(sd, lista);
-
-}
-
 // Questa funzione controlla se un dato utente e' online (quindi raggiungibile)
 bool unreachable(int sd, char username[1024]){
 
@@ -552,12 +472,12 @@ bool unreachable(int sd, char username[1024]){
 
     fclose(fptr);
 
-    // Se e' offline, dobbiamo dirlo al device che ha richiesto la prima chat
+    // Se e' offline, dobbiamo dirlo al device che ha richiesto la chat
 
     fptr = fopen("srv/usr_online.txt", "r");
     fflush(fptr);
     if(!check_word(fptr, username)){
-        change_log(username);
+        //change_log(username);
         send_dv(sd, OFFLINE);
         fclose(fptr);
         return false;
@@ -699,7 +619,7 @@ void dev_chat(int sd){
 
     // Preparo la lista degli utenti online e offline
     char username[1024];
-    crea_lista(sd, username);
+    //crea_lista(sd, username);
     
     char buffer[1024];
     char percorso[1024];
@@ -708,21 +628,25 @@ void dev_chat(int sd){
     FILE* fptr, * fpptr;
     // percorso -> srv/
     strcpy(percorso, "srv/");
-    
+
+    send_dv(sd, RFD);
+    recv(sd, username, sizeof(username), 0);
+
+    send_dv(sd, RFD);
+
     while(1){
 
         // Si riceve l'username richiesto per una chat
         recv(sd, dev_usr, sizeof(dev_usr), 0);
 
         // Prima di tutto controlliamo se il device e' registrato nel sistema
-        fptr = fopen("srv/usr_log.txt", "r");
+        fptr = fopen("srv/usr_all.txt", "r");
         fflush(fptr);
 
         // Se non esiste si invia al device NO
         if(!check_word(fptr, dev_usr)){
             send_dv(sd, NO);
-            // E si ricevera' un ulteriore username da controllare
-            continue;
+            return;
         }
 
         fclose(fptr);
@@ -979,7 +903,7 @@ void srv_list(){
     char stringa[1024];
     char ch;
 
-    FILE* fptr = fopen("srv/usr_online.txt", "r");
+    FILE* fptr = fopen("srv/usr_online.txt", "a+");
 
     ch = fgetc(fptr);
 
@@ -1042,7 +966,9 @@ void srv_out(){
     for(i=0; i <= users; i++){
         send_dv(sockets[i], SRV_OUT);
     }
-    exit(0);
+    while(1){
+        exit(0);
+    }
 
 }
 
@@ -1050,6 +976,85 @@ void handler(int sig){
 
     srv_out();
 
+}
+
+void* tr_code(void* arg){
+
+    int i = *(int*)arg;
+    char command[1024];
+    int ret;
+
+    while(1){
+
+        ret = recv(i, command, sizeof(command), 0);   
+        
+        if(ret > 0){                     // Qui arriva il SEGNALE /command
+
+            // Gestione Registrazione
+            if(!strcmp(command, CMD_REG)){
+                // La funzione si occupa della corretta registrazione del device
+                // Prende in ingresso il socket descriptor
+                dev_reg(i);
+            }
+
+            // Gestione login
+            else if(!strcmp(command, CMD_LOG)){
+                // La funzione si occupa del login del device
+                // Prende in ingresso il socket descriptor
+                if(dev_log(i)){     // In questo caso e' richiesta una registrazione
+                    continue;
+                }
+            }
+
+            // Gestione timestamp
+            else if(!strcmp(command, CMD_TMS)){
+                dev_online(i);
+                // Memorizziamo il socket
+                sockets[users++] = i;
+            }
+
+            // Gestione chat
+            else if(!strcmp(command, CMD_CHAT)){
+                dev_chat(i);
+            }
+                                
+            // Gestione rubric
+            else if(!strcmp(command, CMD_RUBRIC)){
+                dev_rubric(i);
+            }
+
+            // Gestione hanging
+            else if(!strcmp(command, CMD_HANGING)){
+                dev_hanging(i);
+            }
+
+            // Gestione show
+            else if(!strcmp(command, CMD_SHOW)){
+                dev_show(i);
+            }  
+
+            // Gestione logout del Device
+            else if(!strcmp(command, CMD_OFF)){
+                dev_out(i);
+                close(i);                           // Lo chiudo
+                free(arg);
+                pthread_exit(NULL);
+            }
+
+            // Gestione chat offline
+            else if(!strcmp(command, CMD_CHATOFF)){
+                dev_chat_offline(i);
+            }
+
+                                
+        } 
+
+        else{                                   // Socket i e' stato chiuso, Device offline
+            close(i);                           // Lo chiudo
+            free(arg);
+            pthread_exit(NULL);
+        } 
+    } 
 }
 
 int main(int argc, char *argv[]) {
@@ -1063,7 +1068,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in cl_addr;                     // Indirizzo Device 
     int listener;                                   // Socket di ascolto
     int newfd;                                      // Socket di comunicazione
-    char command[1024];
+    //char command[1024];
     char buffer[1024];
     int i;
     int addrlen;
@@ -1158,80 +1163,18 @@ int main(int argc, char *argv[]) {
 
                     newfd = accept(listener, (struct sockaddr *)&cl_addr, (socklen_t*)&addrlen);
 
-                    FD_SET(newfd, &master);                     // Aggiungo il nuovo socket al master
-                    fdmax = (newfd > fdmax) ? newfd : fdmax;    // Aggiorno fdmax
+                    pthread_t tr;
 
-                   
-                } else{                                     // Se il socket pronto e' il comunicatore
+                    int* arg = (int*)malloc(sizeof(int));
+                    *arg = newfd;
+                    ret = pthread_create(&tr, NULL, tr_code, arg);
 
-                while(1){
-                    ret = recv(i, command, sizeof(command), 0);   
+                    if(ret){
+                        printf( "Error: return code from pthread_create is %d\n", ret );
+                        exit(-1);
+                    }
 
-                    if(!ret){                               // Socket i e' stato chiuso, Device offline
-                        FD_CLR(i, &master);                 // Lo tolgo dal master 
-                        close(i);                           // Lo chiudo
-                    } 
-                    else if(ret > 0){                     // Qui arriva il SEGNALE /XXX
-
-                        // Gestione Registrazione
-                        if(!strcmp(command,CMD_REG)){
-                            // La funzione si occupa della corretta registrazione del device
-                            // Prende in ingresso il socket descriptor
-                            dev_reg(i);
-                        }
-
-                        // Gestione login
-                        else if(!strcmp(command, CMD_LOG)){
-                            // La funzione si occupa del login del device
-                            // Prende in ingresso il socket descriptor
-                            if(dev_log(i)){     // In questo caso e' richiesta una registrazione
-                                continue;
-                            }
-                        }
-
-                        // Gestione timestamp
-                        else if(!strcmp(command, CMD_TMS)){
-                            dev_online(i);
-                            // Memorizziamo il socket
-                            sockets[users++] = i;
-                        }
-
-                        // Gestione chat
-                        else if(!strcmp(command, CMD_CHAT)){
-                            dev_chat(i);
-                        }
-                        
-                        // Gestione rubric
-                        else if(!strcmp(command, CMD_RUBRIC)){
-                            dev_rubric(i);
-                        }
-
-                        // Gestione hanging
-                        else if(!strcmp(command, CMD_HANGING)){
-                            dev_hanging(i);
-                        }
-
-                        // Gestione show
-                        else if(!strcmp(command, CMD_SHOW)){
-                            dev_show(i);
-                        }  
-
-                        // Gestione logout del Device
-                        else if(!strcmp(command, CMD_OFF)){
-                            dev_out(i);
-                            FD_CLR(i, &master);                 // Lo tolgo dal master 
-                            close(i);                           // Lo chiudo
-                        }
-
-                        // Gestione chat offline
-                        else if(!strcmp(command, CMD_CHATOFF)){
-                            dev_chat_offline(i);
-                        }
-
-                    } 
-                    break;
-                } 
-                }     
+                }  
             }
         }
     }
