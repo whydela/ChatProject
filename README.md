@@ -15,6 +15,7 @@ Questo file è un chiaro riferimento al registro indicato nelle specifiche.
 - srv/usr_online.txt → in questo file vengono memorizzati i seguenti dati relativi agli utenti online: username, timestamp di login e porta. 
 Il Server legge questo file per il comando list, e stampa a video le informazioni in esso contenuto, delimitate da asterischi. È compito del Server aggiornare il file nel caso di login e logout dei Device. 
 Quando il Server termina la sua esecuzione provvede a cancellare tutto il contenuto del file.
+
 Dopo aver effettuato il login o la sign up, il Device mostra a video un menù con tutti i comandi che è possibile eseguire.
 I comandi hanging e show sono in linea con quello richiesto dalle specifiche.
 Ora analizziamo il comportamento del comando chat: 
